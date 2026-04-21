@@ -1,12 +1,23 @@
 import { Module } from '@nestjs/common';
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { HealthController } from './health.controller';
 import { AppointmentsModule } from './appointments/appointments.module';
+import { Appointment } from './appointments/entities/appointment.entity';
 
 @Module({
-  imports: [AppointmentsModule],
-  controllers: [AppController, HealthController],
-  providers: [AppService],
+  imports: [
+    TypeOrmModule.forRoot({
+      type: 'postgres',
+      host: process.env.DB_HOST ?? 'localhost',
+      port: Number(process.env.DB_PORT ?? 5432),
+      username: process.env.DB_USER ?? 'dentia',
+      password: process.env.DB_PASSWORD ?? 'dentia123',
+      database: process.env.DB_NAME ?? 'dentia_appointments',
+      entities: [Appointment],
+      synchronize: true,
+    }),
+    AppointmentsModule,
+  ],
+  controllers: [HealthController],
 })
 export class AppModule {}

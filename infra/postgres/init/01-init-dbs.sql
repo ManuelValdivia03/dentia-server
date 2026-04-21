@@ -1,0 +1,1 @@
+CREATE DATABASE dentia_auth;

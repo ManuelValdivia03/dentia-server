@@ -1,18 +1,165 @@
-import { Test, TestingModule } from '@nestjs/testing';
+/// <reference types="jest" />
+
+jest.mock('bcrypt', () => ({
+  hash: jest.fn(),
+  compare: jest.fn(),
+}));
+
+import { UnauthorizedException } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import * as bcrypt from 'bcrypt';
 import { AuthService } from './auth.service';
+import { UserRole } from '../users/enums/user-role.enum';
 
 describe('AuthService', () => {
   let service: AuthService;
+  let usersRepository: any;
+  let jwtService: jest.Mocked<JwtService>;
 
-  beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [AuthService],
-    }).compile();
+  beforeEach(() => {
+    usersRepository = {
+      count: jest.fn(),
+      create: jest.fn(),
+      save: jest.fn(),
+      findOne: jest.fn(),
+    };
 
-    service = module.get<AuthService>(AuthService);
+    jwtService = {
+      signAsync: jest.fn(),
+    } as any;
+
+    service = new AuthService(usersRepository, jwtService);
+
+    jest.clearAllMocks();
   });
 
   it('should be defined', () => {
     expect(service).toBeDefined();
+  });
+
+  it('onModuleInit no debe sembrar usuarios si ya existen', async () => {
+    usersRepository.count.mockResolvedValueOnce(1);
+
+    await service.onModuleInit();
+
+    expect(usersRepository.count).toHaveBeenCalled();
+    expect(usersRepository.create).not.toHaveBeenCalled();
+    expect(usersRepository.save).not.toHaveBeenCalled();
+  });
+
+  it('onModuleInit debe sembrar 3 usuarios si no existen', async () => {
+    usersRepository.count.mockResolvedValueOnce(0);
+
+    usersRepository.create.mockImplementation((data: any) => data);
+    usersRepository.save.mockImplementation(async (data: any) => data);
+
+    (bcrypt.hash as jest.Mock).mockImplementation(
+      async (value: string) => `hash-${value}`,
+    );
+
+    await service.onModuleInit();
+
+    expect(usersRepository.count).toHaveBeenCalled();
+    expect(bcrypt.hash).toHaveBeenCalledTimes(3);
+    expect(usersRepository.create).toHaveBeenCalledTimes(3);
+    expect(usersRepository.save).toHaveBeenCalledTimes(3);
+
+    expect(usersRepository.create).toHaveBeenNthCalledWith(1, {
+      email: 'admin@dentia.local',
+      passwordHash: 'hash-Admin123*',
+      role: UserRole.ADMIN,
+      domainId: 'admin1',
+      isActive: true,
+    });
+
+    expect(usersRepository.create).toHaveBeenNthCalledWith(2, {
+      email: 'patient1@dentia.local',
+      passwordHash: 'hash-Patient123*',
+      role: UserRole.PATIENT,
+      domainId: 'p1',
+      isActive: true,
+    });
+
+    expect(usersRepository.create).toHaveBeenNthCalledWith(3, {
+      email: 'dentist1@dentia.local',
+      passwordHash: 'hash-Dentist123*',
+      role: UserRole.DENTIST,
+      domainId: 'd1',
+      isActive: true,
+    });
+  });
+
+  it('login debe regresar token y usuario si las credenciales son válidas', async () => {
+    const dto = {
+      email: 'patient1@dentia.local',
+      password: 'Patient123*',
+    };
+
+    const user = {
+      id: 'u1',
+      email: 'patient1@dentia.local',
+      passwordHash: 'hash-real',
+      role: UserRole.PATIENT,
+      domainId: 'p1',
+      isActive: true,
+    };
+
+    usersRepository.findOne.mockResolvedValueOnce(user);
+    (bcrypt.compare as jest.Mock).mockResolvedValueOnce(true);
+    jwtService.signAsync.mockResolvedValueOnce('jwt-token');
+
+    const result = await service.login(dto);
+
+    expect(usersRepository.findOne).toHaveBeenCalledWith({
+      where: { email: dto.email, isActive: true },
+    });
+
+    expect(jwtService.signAsync).toHaveBeenCalledWith({
+      sub: 'u1',
+      role: UserRole.PATIENT,
+      domainId: 'p1',
+      email: 'patient1@dentia.local',
+    });
+
+    expect(result).toEqual({
+      accessToken: 'jwt-token',
+      user: {
+        id: 'u1',
+        email: 'patient1@dentia.local',
+        role: UserRole.PATIENT,
+        domainId: 'p1',
+      },
+    });
+  });
+
+  it('login debe fallar si el usuario no existe', async () => {
+    usersRepository.findOne.mockResolvedValueOnce(null);
+
+    await expect(
+      service.login({
+        email: 'noexiste@dentia.local',
+        password: 'cualquier123',
+      }),
+    ).rejects.toThrow(UnauthorizedException);
+  });
+
+  it('login debe fallar si la contraseña no coincide', async () => {
+    usersRepository.findOne.mockResolvedValueOnce({
+      id: 'u1',
+      email: 'patient1@dentia.local',
+      passwordHash: 'hash-real',
+      role: UserRole.PATIENT,
+      domainId: 'p1',
+      isActive: true,
+    });
+
+    (bcrypt.compare as jest.Mock).mockResolvedValueOnce(false);
+
+    await expect(
+      service.login({
+        email: 'patient1@dentia.local',
+        password: 'incorrecta123',
+      }),
+    ).rejects.toThrow(UnauthorizedException);
   });
 });

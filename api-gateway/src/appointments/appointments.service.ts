@@ -1,29 +1,67 @@
-import { Injectable } from '@nestjs/common';
-import { HttpService } from '@nestjs/axios';
+import { Inject, Injectable } from '@nestjs/common';
+import { ClientProxy } from '@nestjs/microservices';
 import { firstValueFrom } from 'rxjs';
+import { CreateAppointmentDto } from './dto/create-appointment.dto';
+import { RescheduleAppointmentDto } from './dto/reschedule-appointment.dto';
 
 @Injectable()
 export class AppointmentsService {
-  constructor(private readonly http: HttpService) {}
+  constructor(
+    @Inject('APPOINTMENTS_SERVICE')
+    private readonly client: ClientProxy,
+  ) {}
 
-  async create(body: any) {
-    const response = await firstValueFrom(
-      this.http.post('http://localhost:3002/appointments', body),
+  findAll() {
+    return firstValueFrom(
+      this.client.send({ cmd: 'appointments.findAll' }, {}),
     );
-    return response.data;
   }
 
-  async findAll() {
-    const response = await firstValueFrom(
-      this.http.get('http://localhost:3002/appointments'),
+  findOne(id: string) {
+    return firstValueFrom(
+      this.client.send({ cmd: 'appointments.findOne' }, { id }),
     );
-    return response.data;
   }
 
-  async findOne(id: string) {
-    const response = await firstValueFrom(
-      this.http.get(`http://localhost:3002/appointments/${id}`),
+  getAvailability(dentistId: string, date: string) {
+    return firstValueFrom(
+      this.client.send(
+        { cmd: 'appointments.availability' },
+        { dentistId, date },
+      ),
     );
-    return response.data;
+  }
+
+  create(dto: CreateAppointmentDto) {
+    return firstValueFrom(
+      this.client.send({ cmd: 'appointments.create' }, dto),
+    );
+  }
+
+  reschedule(id: string, dto: RescheduleAppointmentDto) {
+    return firstValueFrom(
+      this.client.send(
+        { cmd: 'appointments.reschedule' },
+        { id, dto },
+      ),
+    );
+  }
+
+  cancel(id: string) {
+    return firstValueFrom(
+      this.client.send({ cmd: 'appointments.cancel' }, { id }),
+    );
+  }
+
+  confirm(id: string) {
+    return firstValueFrom(
+      this.client.send({ cmd: 'appointments.confirm' }, { id }),
+    );
+  }
+
+  complete(id: string) {
+    return firstValueFrom(
+      this.client.send({ cmd: 'appointments.complete' }, { id }),
+    );
   }
 }
