@@ -1,6 +1,5 @@
 /// <reference types="jest" />
 
-import { ForbiddenException } from '@nestjs/common';
 import { AppointmentsController } from './appointments.controller';
 import { AppointmentsService } from './appointments.service';
 import { UserRole } from '../auth/enums/user-role.enum';
@@ -39,48 +38,57 @@ describe('AppointmentsController', () => {
     controller = new AppointmentsController(service);
   });
 
-  it('PATIENT solo debe ver sus citas en findAll', async () => {
-    service.findAll.mockResolvedValueOnce(appointments as any);
+  it('PATIENT debe delegar findAll con req.user', async () => {
+    service.findAll.mockResolvedValueOnce([appointments[0]] as any);
 
     const req: any = {
       user: {
+        sub: 'u1',
         role: UserRole.PATIENT,
         domainId: 'p1',
+        email: 'patient1@dentia.local',
       },
     };
 
     const result = await controller.findAll(req);
 
+    expect(service.findAll).toHaveBeenCalledWith(req.user);
     expect(result).toEqual([appointments[0]]);
   });
 
-  it('DENTIST solo debe ver sus citas en findAll', async () => {
-    service.findAll.mockResolvedValueOnce(appointments as any);
+  it('DENTIST debe delegar findAll con req.user', async () => {
+    service.findAll.mockResolvedValueOnce([appointments[1]] as any);
 
     const req: any = {
       user: {
+        sub: 'u2',
         role: UserRole.DENTIST,
         domainId: 'd2',
+        email: 'dentist1@dentia.local',
       },
     };
 
     const result = await controller.findAll(req);
 
+    expect(service.findAll).toHaveBeenCalledWith(req.user);
     expect(result).toEqual([appointments[1]]);
   });
 
-  it('ADMIN debe ver todas las citas en findAll', async () => {
+  it('ADMIN debe delegar findAll con req.user', async () => {
     service.findAll.mockResolvedValueOnce(appointments as any);
 
     const req: any = {
       user: {
+        sub: 'u3',
         role: UserRole.ADMIN,
         domainId: 'admin1',
+        email: 'admin@dentia.local',
       },
     };
 
     const result = await controller.findAll(req);
 
+    expect(service.findAll).toHaveBeenCalledWith(req.user);
     expect(result).toEqual(appointments);
   });
 
@@ -93,50 +101,68 @@ describe('AppointmentsController', () => {
       reason: 'Limpieza',
     };
 
+    const req: any = {
+      user: {
+        sub: 'u1',
+        role: UserRole.PATIENT,
+        domainId: 'p1',
+        email: 'patient1@dentia.local',
+      },
+    };
+
     service.create.mockResolvedValueOnce({
       ...dto,
       patientId: 'p1',
     } as any);
 
-    const req: any = {
-      user: {
-        role: UserRole.PATIENT,
-        domainId: 'p1',
+    const result = await controller.create(dto, req);
+
+    expect(service.create).toHaveBeenCalledWith(
+      {
+        ...dto,
+        patientId: 'p1',
       },
-    };
-
-    await controller.create(dto, req);
-
-    expect(service.create).toHaveBeenCalledWith({
+      req.user,
+    );
+    expect(result).toEqual({
       ...dto,
       patientId: 'p1',
     });
   });
 
-  it('PATIENT no debe poder confirmar citas', async () => {
+  it('ADMIN debe mantener el patientId enviado al crear', async () => {
+    const dto: any = {
+      patientId: 'p2',
+      dentistId: 'd1',
+      startAt: '2026-04-22T10:00:00.000Z',
+      endAt: '2026-04-22T11:00:00.000Z',
+      reason: 'Limpieza',
+    };
+
     const req: any = {
       user: {
-        role: UserRole.PATIENT,
-        domainId: 'p1',
+        sub: 'u3',
+        role: UserRole.ADMIN,
+        domainId: 'admin1',
+        email: 'admin@dentia.local',
       },
     };
 
-    service.findOne.mockResolvedValueOnce({
-      id: 'a1',
-      patientId: 'p1',
-      dentistId: 'd1',
-    } as any);
+    service.create.mockResolvedValueOnce(dto);
 
-    await expect(controller.confirm('a1', req)).rejects.toThrow(
-      ForbiddenException,
-    );
+    const result = await controller.create(dto, req);
+
+    expect(service.create).toHaveBeenCalledWith(dto, req.user);
+    expect(result).toEqual(dto);
   });
 
-  it('DENTIST debe poder confirmar una cita propia', async () => {
+  it('debe delegar confirm con id y req.user', async () => {
     const req: any = {
       user: {
+        sub: 'u2',
         role: UserRole.DENTIST,
         domainId: 'd1',
+        email: 'dentist1@dentia.local',
       },
     };
 
@@ -147,39 +173,21 @@ describe('AppointmentsController', () => {
       status: 'CONFIRMED',
     };
 
-    service.findOne.mockResolvedValueOnce(appointment as any);
     service.confirm.mockResolvedValueOnce(appointment as any);
 
     const result = await controller.confirm('a1', req);
 
-    expect(service.confirm).toHaveBeenCalledWith('a1');
+    expect(service.confirm).toHaveBeenCalledWith('a1', req.user);
     expect(result).toEqual(appointment);
   });
 
-  it('DENTIST no debe poder confirmar una cita ajena', async () => {
+  it('debe delegar findOne con id y req.user', async () => {
     const req: any = {
       user: {
-        role: UserRole.DENTIST,
-        domainId: 'd1',
-      },
-    };
-
-    service.findOne.mockResolvedValueOnce({
-      id: 'a2',
-      patientId: 'p2',
-      dentistId: 'd2',
-    } as any);
-
-    await expect(controller.confirm('a2', req)).rejects.toThrow(
-      ForbiddenException,
-    );
-  });
-
-  it('ADMIN debe poder ver cualquier cita', async () => {
-    const req: any = {
-      user: {
+        sub: 'u3',
         role: UserRole.ADMIN,
         domainId: 'admin1',
+        email: 'admin@dentia.local',
       },
     };
 
@@ -193,6 +201,7 @@ describe('AppointmentsController', () => {
 
     const result = await controller.findOne('a2', req);
 
+    expect(service.findOne).toHaveBeenCalledWith('a2', req.user);
     expect(result).toEqual(appointment);
   });
 });

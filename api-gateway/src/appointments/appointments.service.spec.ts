@@ -1,12 +1,20 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { of } from 'rxjs';
 import { AppointmentsService } from './appointments.service';
+import { UserRole } from '../auth/enums/user-role.enum';
 
 describe('AppointmentsService', () => {
   let service: AppointmentsService;
 
   const clientProxyMock = {
     send: jest.fn(),
+  };
+
+  const requester = {
+    sub: 'user-1',
+    role: UserRole.PATIENT,
+    domainId: 'p1',
+    email: 'patient1@dentia.local',
   };
 
   beforeEach(async () => {
@@ -33,11 +41,11 @@ describe('AppointmentsService', () => {
     const expected = [{ id: 'a1' }];
     clientProxyMock.send.mockReturnValueOnce(of(expected));
 
-    const result = await service.findAll();
+    const result = await service.findAll(requester as any);
 
     expect(clientProxyMock.send).toHaveBeenCalledWith(
       { cmd: 'appointments.findAll' },
-      {},
+      { requester },
     );
     expect(result).toEqual(expected);
   });
@@ -46,11 +54,11 @@ describe('AppointmentsService', () => {
     const expected = { id: 'a1' };
     clientProxyMock.send.mockReturnValueOnce(of(expected));
 
-    const result = await service.findOne('a1');
+    const result = await service.findOne('a1', requester as any);
 
     expect(clientProxyMock.send).toHaveBeenCalledWith(
       { cmd: 'appointments.findOne' },
-      { id: 'a1' },
+      { id: 'a1', requester },
     );
     expect(result).toEqual(expected);
   });
@@ -67,11 +75,11 @@ describe('AppointmentsService', () => {
 
     clientProxyMock.send.mockReturnValueOnce(of(expected));
 
-    const result = await service.create(dto as any);
+    const result = await service.create(dto as any, requester as any);
 
     expect(clientProxyMock.send).toHaveBeenCalledWith(
       { cmd: 'appointments.create' },
-      dto,
+      { dto, requester },
     );
     expect(result).toEqual(expected);
   });

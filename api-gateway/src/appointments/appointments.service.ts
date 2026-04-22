@@ -3,6 +3,7 @@ import { ClientProxy } from '@nestjs/microservices';
 import { firstValueFrom } from 'rxjs';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
 import { RescheduleAppointmentDto } from './dto/reschedule-appointment.dto';
+import { RequestUser } from './interfaces/request-user.interface';
 
 @Injectable()
 export class AppointmentsService {
@@ -11,57 +12,57 @@ export class AppointmentsService {
     private readonly client: ClientProxy,
   ) {}
 
-  findAll() {
+  findAll(requester: RequestUser) {
     return firstValueFrom(
-      this.client.send({ cmd: 'appointments.findAll' }, {}),
+      this.client.send({ cmd: 'appointments.findAll' }, { requester }),
     );
   }
 
-  findOne(id: string) {
+  findOne(id: string, requester: RequestUser) {
     return firstValueFrom(
-      this.client.send({ cmd: 'appointments.findOne' }, { id }),
+      this.client.send({ cmd: 'appointments.findOne' }, { id, requester }),
     );
   }
 
-  getAvailability(dentistId: string, date: string) {
+  getAvailability(dentistId: string, date: string, requester: RequestUser) {
     return firstValueFrom(
       this.client.send(
         { cmd: 'appointments.availability' },
-        { dentistId, date },
+        { dentistId, date, requester },
       ),
     );
   }
 
-  create(dto: CreateAppointmentDto) {
+  create(dto: CreateAppointmentDto, requester: RequestUser) {
     return firstValueFrom(
-      this.client.send({ cmd: 'appointments.create' }, dto),
+      this.client.send({ cmd: 'appointments.create' }, { dto, requester }),
     );
   }
 
-  reschedule(id: string, dto: RescheduleAppointmentDto) {
+  reschedule(id: string, dto: RescheduleAppointmentDto, requester: RequestUser) {
     return firstValueFrom(
       this.client.send(
         { cmd: 'appointments.reschedule' },
-        { id, dto },
+        { id, dto, requester },
       ),
     );
   }
 
-  cancel(id: string) {
+  cancel(id: string, requester: RequestUser) {
     return firstValueFrom(
-      this.client.send({ cmd: 'appointments.cancel' }, { id }),
+      this.client.send({ cmd: 'appointments.cancel' }, { id, requester }),
     );
   }
 
-  confirm(id: string) {
+  confirm(id: string, requester: RequestUser) {
     return firstValueFrom(
-      this.client.send({ cmd: 'appointments.confirm' }, { id }),
+      this.client.send({ cmd: 'appointments.confirm' }, { id, requester }),
     );
   }
 
-  complete(id: string) {
+  complete(id: string, requester: RequestUser) {
     return firstValueFrom(
-      this.client.send({ cmd: 'appointments.complete' }, { id }),
+      this.client.send({ cmd: 'appointments.complete' }, { id, requester }),
     );
   }
 }

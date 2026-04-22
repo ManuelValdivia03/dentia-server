@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -9,6 +10,7 @@ import { Appointment } from './entities/appointment.entity';
 import { AppointmentStatus } from './enums/appointment-status.enum';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
 import { RescheduleAppointmentDto } from './dto/reschedule-appointment.dto';
+import { RequestUser, RequestUserRole } from './interfaces/request-user.interface';
 
 @Injectable()
 export class AppointmentsService {
@@ -17,19 +19,36 @@ export class AppointmentsService {
     private readonly appointmentsRepository: Repository<Appointment>,
   ) {}
 
-  async findAll() {
+  async findAll(requester: RequestUser) {
+    const where =
+      requester.role === RequestUserRole.ADMIN
+        ? {}
+        : requester.role === RequestUserRole.PATIENT
+          ? { patientId: requester.domainId }
+          : { dentistId: requester.domainId };
+
     return this.appointmentsRepository.find({
+      where,
       order: { startAt: 'ASC' },
     });
   }
 
-  async findOne(id: string) {
-    return this.findByIdOrFail(id);
+  async findOne(id: string, requester: RequestUser) {
+    const appointment = await this.findByIdOrFail(id);
+    this.ensureCanViewAppointment(appointment, requester);
+    return appointment;
   }
 
-  async getAvailability(dentistId: string, date: string) {
+  async getAvailability(dentistId: string, date: string, requester: RequestUser) {
     if (!dentistId || !date) {
       throw new BadRequestException('dentistId y date son obligatorios');
+    }
+
+    if (
+      requester.role === RequestUserRole.DENTIST &&
+      dentistId !== requester.domainId
+    ) {
+      throw new ForbiddenException('No puedes consultar disponibilidad de otro dentista');
     }
 
     const dayStart = new Date(`${date}T00:00:00.000Z`);
@@ -52,16 +71,11 @@ export class AppointmentsService {
 
     const slots: { startAt: Date; endAt: Date; available: boolean }[] = [];
     for (let hour = 9; hour < 17; hour++) {
-      const startAt = new Date(
-        `${date}T${String(hour).padStart(2, '0')}:00:00.000Z`,
-      );
-      const endAt = new Date(
-        `${date}T${String(hour + 1).padStart(2, '0')}:00:00.000Z`,
-      );
+      const startAt = new Date(`${date}T${String(hour).padStart(2, '0')}:00:00.000Z`);
+      const endAt = new Date(`${date}T${String(hour + 1).padStart(2, '0')}:00:00.000Z`);
 
       const occupied = appointments.some(
-        (appointment) =>
-          appointment.startAt < endAt && appointment.endAt > startAt,
+        (appointment) => appointment.startAt < endAt && appointment.endAt > startAt,
       );
 
       slots.push({
@@ -78,12 +92,18 @@ export class AppointmentsService {
     };
   }
 
-  async create(dto: CreateAppointmentDto) {
+  async create(dto: CreateAppointmentDto, requester: RequestUser) {
+    if (
+      requester.role === RequestUserRole.PATIENT &&
+      dto.patientId !== requester.domainId
+    ) {
+      throw new ForbiddenException('No puedes crear citas para otro paciente');
+    }
+
     const startAt = new Date(dto.startAt);
     const endAt = new Date(dto.endAt);
 
     this.validateRange(startAt, endAt);
-
     await this.ensureNoOverlap(dto.dentistId, startAt, endAt);
 
     const appointment = this.appointmentsRepository.create({
@@ -99,20 +119,15 @@ export class AppointmentsService {
     return this.appointmentsRepository.save(appointment);
   }
 
-  async reschedule(id: string, dto: RescheduleAppointmentDto) {
+  async reschedule(id: string, dto: RescheduleAppointmentDto, requester: RequestUser) {
     const appointment = await this.findByIdOrFail(id);
+    this.ensurePatientOrAdminCanManage(appointment, requester);
 
     const startAt = new Date(dto.startAt);
     const endAt = new Date(dto.endAt);
 
     this.validateRange(startAt, endAt);
-
-    await this.ensureNoOverlap(
-      appointment.dentistId,
-      startAt,
-      endAt,
-      appointment.id,
-    );
+    await this.ensureNoOverlap(appointment.dentistId, startAt, endAt, appointment.id);
 
     appointment.startAt = startAt;
     appointment.endAt = endAt;
@@ -121,14 +136,16 @@ export class AppointmentsService {
     return this.appointmentsRepository.save(appointment);
   }
 
-  async cancel(id: string) {
+  async cancel(id: string, requester: RequestUser) {
     const appointment = await this.findByIdOrFail(id);
+    this.ensureCanCancelAppointment(appointment, requester);
     appointment.status = AppointmentStatus.CANCELLED;
     return this.appointmentsRepository.save(appointment);
   }
 
-  async confirm(id: string) {
+  async confirm(id: string, requester: RequestUser) {
     const appointment = await this.findByIdOrFail(id);
+    this.ensureDentistOrAdminCanOperate(appointment, requester);
 
     if (appointment.status === AppointmentStatus.CANCELLED) {
       throw new BadRequestException('No se puede confirmar una cita cancelada');
@@ -138,8 +155,9 @@ export class AppointmentsService {
     return this.appointmentsRepository.save(appointment);
   }
 
-  async complete(id: string) {
+  async complete(id: string, requester: RequestUser) {
     const appointment = await this.findByIdOrFail(id);
+    this.ensureDentistOrAdminCanOperate(appointment, requester);
 
     if (appointment.status === AppointmentStatus.CANCELLED) {
       throw new BadRequestException('No se puede completar una cita cancelada');
@@ -162,17 +180,12 @@ export class AppointmentsService {
   }
 
   private validateRange(startAt: Date, endAt: Date) {
-    if (
-      Number.isNaN(startAt.getTime()) ||
-      Number.isNaN(endAt.getTime())
-    ) {
+    if (Number.isNaN(startAt.getTime()) || Number.isNaN(endAt.getTime())) {
       throw new BadRequestException('Fechas inválidas');
     }
 
     if (endAt <= startAt) {
-      throw new BadRequestException(
-        'endAt debe ser mayor que startAt',
-      );
+      throw new BadRequestException('endAt debe ser mayor que startAt');
     }
   }
 
@@ -198,9 +211,85 @@ export class AppointmentsService {
     const overlapping = await query.getOne();
 
     if (overlapping) {
-      throw new BadRequestException(
-        'El dentista ya tiene una cita en ese horario',
-      );
+      throw new BadRequestException('El dentista ya tiene una cita en ese horario');
     }
+  }
+
+  private ensureCanViewAppointment(appointment: Appointment, requester: RequestUser) {
+    if (requester.role === RequestUserRole.ADMIN) {
+      return;
+    }
+
+    if (
+      requester.role === RequestUserRole.PATIENT &&
+      appointment.patientId !== requester.domainId
+    ) {
+      throw new ForbiddenException('No puedes ver citas de otro paciente');
+    }
+
+    if (
+      requester.role === RequestUserRole.DENTIST &&
+      appointment.dentistId !== requester.domainId
+    ) {
+      throw new ForbiddenException('No puedes ver citas de otro dentista');
+    }
+  }
+
+  private ensurePatientOrAdminCanManage(
+    appointment: Appointment,
+    requester: RequestUser,
+  ) {
+    if (requester.role === RequestUserRole.ADMIN) {
+      return;
+    }
+
+    if (
+      requester.role === RequestUserRole.PATIENT &&
+      appointment.patientId === requester.domainId
+    ) {
+      return;
+    }
+
+    throw new ForbiddenException('No puedes reprogramar esta cita');
+  }
+
+  private ensureCanCancelAppointment(appointment: Appointment, requester: RequestUser) {
+    if (requester.role === RequestUserRole.ADMIN) {
+      return;
+    }
+
+    if (
+      requester.role === RequestUserRole.PATIENT &&
+      appointment.patientId === requester.domainId
+    ) {
+      return;
+    }
+
+    if (
+      requester.role === RequestUserRole.DENTIST &&
+      appointment.dentistId === requester.domainId
+    ) {
+      return;
+    }
+
+    throw new ForbiddenException('No puedes cancelar esta cita');
+  }
+
+  private ensureDentistOrAdminCanOperate(
+    appointment: Appointment,
+    requester: RequestUser,
+  ) {
+    if (requester.role === RequestUserRole.ADMIN) {
+      return;
+    }
+
+    if (
+      requester.role === RequestUserRole.DENTIST &&
+      appointment.dentistId === requester.domainId
+    ) {
+      return;
+    }
+
+    throw new ForbiddenException('No tienes permisos para operar esta cita');
   }
 }
