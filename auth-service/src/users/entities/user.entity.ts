@@ -27,6 +27,12 @@ export class User {
   @Column()
   domainId!: string;
 
+  @Column({ length: 120, nullable: true })
+  fullName?: string;
+
+  @Column({ length: 120, nullable: true })
+  specialty?: string;
+
   @Column({ default: true })
   isActive!: boolean;
 

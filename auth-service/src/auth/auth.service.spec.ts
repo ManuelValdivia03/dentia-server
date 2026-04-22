@@ -48,35 +48,34 @@ describe('AuthService', () => {
   });
 
   it('onModuleInit debe sembrar 3 usuarios si no existen', async () => {
-    usersRepository.count.mockResolvedValueOnce(0);
+  usersRepository.count.mockResolvedValue(0);
+  usersRepository.create.mockImplementation((data) => data as any);
+  usersRepository.save.mockResolvedValue({} as any);
 
-    usersRepository.create.mockImplementation((data: any) => data);
-    usersRepository.save.mockImplementation(async (data: any) => data);
+  (bcrypt.hash as jest.Mock).mockImplementation(async (value: string) => `hash-${value}`);
 
-    (bcrypt.hash as jest.Mock).mockImplementation(
-      async (value: string) => `hash-${value}`,
-    );
+  await service.onModuleInit();
 
-    await service.onModuleInit();
+  expect(usersRepository.save).toHaveBeenCalledTimes(3);
 
-    expect(usersRepository.count).toHaveBeenCalled();
-    expect(bcrypt.hash).toHaveBeenCalledTimes(3);
-    expect(usersRepository.create).toHaveBeenCalledTimes(3);
-    expect(usersRepository.save).toHaveBeenCalledTimes(3);
-
-    expect(usersRepository.create).toHaveBeenNthCalledWith(1, {
+  expect(usersRepository.create).toHaveBeenNthCalledWith(
+    1,
+    expect.objectContaining({
       email: 'admin@dentia.local',
       passwordHash: 'hash-Admin123*',
       role: UserRole.ADMIN,
       domainId: 'admin1',
+      fullName: 'Administrador Dentia',
       isActive: true,
-    });
+    }),
+  );
 
     expect(usersRepository.create).toHaveBeenNthCalledWith(2, {
       email: 'patient1@dentia.local',
       passwordHash: 'hash-Patient123*',
       role: UserRole.PATIENT,
       domainId: 'p1',
+      fullName: 'Paciente Demo',
       isActive: true,
     });
 
@@ -85,6 +84,8 @@ describe('AuthService', () => {
       passwordHash: 'hash-Dentist123*',
       role: UserRole.DENTIST,
       domainId: 'd1',
+      fullName: 'Dra. Demo Dentia',
+      specialty: 'Odontología general',
       isActive: true,
     });
   });

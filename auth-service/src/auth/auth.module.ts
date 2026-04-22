@@ -4,6 +4,9 @@ import { JwtModule } from '@nestjs/jwt';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { User } from '../users/entities/user.entity';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { UsersController } from '../users/users.controller';
+import { DentistsController } from '../users/dentists.controller';
 
 @Module({
   imports: [
@@ -13,7 +16,7 @@ import { User } from '../users/entities/user.entity';
       signOptions: { expiresIn: '1d' },
     }),
   ],
-  controllers: [AuthController],
-  providers: [AuthService],
+  controllers: [AuthController, UsersController, DentistsController],
+  providers: [AuthService, JwtAuthGuard],
 })
 export class AuthModule {}
