@@ -6,19 +6,16 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 type AuthenticatedRequest = Request & {
   user: {
     sub: string;
-    role: string;
-    domainId: string;
-    email: string;
   };
 };
 
-@Controller('users')
+@Controller('profile')
 export class UsersController {
   constructor(private readonly authService: AuthService) {}
 
   @UseGuards(JwtAuthGuard)
-  @Get('me')
-  getMe(@Req() req: AuthenticatedRequest) {
+  @Get()
+  getProfile(@Req() req: AuthenticatedRequest) {
     return this.authService.getMe(req.headers.authorization as string);
   }
 }

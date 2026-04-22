@@ -9,13 +9,13 @@ type AuthenticatedRequest = Request & {
   };
 };
 
-@Controller('users')
+@Controller('profile')
 export class UsersController {
   constructor(private readonly authService: AuthService) {}
 
   @UseGuards(JwtAuthGuard)
-  @Get('me')
-  getMe(@Req() req: AuthenticatedRequest) {
+  @Get()
+  getProfile(@Req() req: AuthenticatedRequest) {
     return this.authService.getProfileByUserId(req.user.sub);
   }
 }

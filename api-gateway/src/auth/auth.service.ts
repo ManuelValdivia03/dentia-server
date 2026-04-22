@@ -26,7 +26,7 @@ export class AuthService {
 
   getMe(authorization: string) {
     return this.forwardRequest(() =>
-      this.httpService.get(`${this.authServiceBaseUrl}/users/me`, {
+      this.httpService.get(`${this.authServiceBaseUrl}/profile`, {
         headers: { authorization },
       }),
     );
