@@ -59,6 +59,28 @@ services:
     ports:
       - "${APPOINTMENTS_HTTP_PORT}:3002"
       - "${APPOINTMENTS_TCP_PORT}:${APPOINTMENTS_TCP_PORT}"
+  
+  prescriptions-service:
+    build:
+      context: ./prescriptions-service
+      dockerfile: Dockerfile
+    container_name: dentia-prescriptions-service
+    restart: unless-stopped
+    environment:
+      PORT: ${PRESCRIPTIONS_SERVICE_PORT}
+      PRESCRIPTIONS_TCP_HOST: 0.0.0.0
+      PRESCRIPTIONS_TCP_PORT: ${PRESCRIPTIONS_TCP_PORT}
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_NAME: ${POSTGRES_PRESCRIPTIONS_DB}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "${PRESCRIPTIONS_SERVICE_PORT}:3003"
+      - "${PRESCRIPTIONS_TCP_PORT}:${PRESCRIPTIONS_TCP_PORT}"
 
   api-gateway:
     build:
@@ -71,10 +93,13 @@ services:
       AUTH_SERVICE_URL: http://auth-service:3001
       APPOINTMENTS_TCP_HOST: appointments-service
       APPOINTMENTS_TCP_PORT: ${APPOINTMENTS_TCP_PORT}
+      PRESCRIPTIONS_TCP_HOST: prescriptions-service
+      PRESCRIPTIONS_TCP_PORT: ${PRESCRIPTIONS_TCP_PORT}
       JWT_SECRET: ${JWT_SECRET}
     depends_on:
       - auth-service
       - appointments-service
+      - prescriptions-service
     ports:
       - "${API_GATEWAY_PORT}:3000"
 
