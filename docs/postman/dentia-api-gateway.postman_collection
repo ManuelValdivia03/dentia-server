@@ -1,0 +1,1267 @@
+{
+  "info": {
+    "_postman_id": "bcd7c457-27c6-4f97-b613-2a2af6a74dac",
+    "name": "Dentia API Gateway",
+    "description": "### Welcome to Postman! This is your first collection. \n\nCollections are your starting point for building and testing APIs. You can use this one to:\n\n• Group related requests\n• Test your API in real-world scenarios\n• Document and share your requests\n\nUpdate the name and overview whenever you’re ready to make it yours.\n\n[Learn more about Postman Collections.](https://learning.postman.com/docs/collections/collections-overview/)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "52552692",
+    "_collection_link": "https://go.postman.co/collection/52552692-bcd7c457-27c6-4f97-b613-2a2af6a74dac?source=collection_link"
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});"
+            ],
+            "type": "text/javascript",
+            "packages": {},
+            "requests": {}
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n  \"email\": \"patient1@dentia.local\",\r\n  \"password\": \"Patient123*\"\r\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "http://localhost:3000/auth/login",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "3000",
+          "path": [
+            "auth",
+            "login"
+          ]
+        },
+        "description": "This is a GET request and it is used to \"get\" data from an endpoint. There is no request body for a GET request, but you can use query parameters to help specify the resource you want data on (e.g., in this request, we have `id=1`).\n\nA successful GET response will have a `200 OK` status, and should include some kind of response body - for example, HTML web content or JSON data."
+      },
+      "response": [
+        {
+          "name": "Login Dentista",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n  \"email\": \"dentist1@dentia.local\",\r\n  \"password\": \"Dentist123*\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "http://localhost:3000/auth/login",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "auth",
+                "login"
+              ]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": null,
+          "header": [
+            {
+              "key": "X-Powered-By",
+              "value": "Express"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json; charset=utf-8"
+            },
+            {
+              "key": "Content-Length",
+              "value": "476"
+            },
+            {
+              "key": "ETag",
+              "value": "W/\"1dc-X1kKnEER9Q+QuvqQx63oLsPDk+U\""
+            },
+            {
+              "key": "Date",
+              "value": "Fri, 08 May 2026 09:19:58 GMT"
+            },
+            {
+              "key": "Connection",
+              "value": "keep-alive"
+            },
+            {
+              "key": "Keep-Alive",
+              "value": "timeout=5"
+            }
+          ],
+          "cookie": [],
+          "body": "{\n    \"accessToken\": \"{{accessToken}}",\n    \"user\": {\n        \"id\": \"147063ae-bba2-42f4-8d1f-8b1ba988bdc6\",\n        \"email\": \"dentist1@dentia.local\",\n        \"role\": \"DENTIST\",\n        \"domainId\": \"d1\",\n        \"fullName\": \"Dra. Demo Dentia\",\n        \"specialty\": \"Odontología general\"\n    }\n}"
+        },
+        {
+          "name": "Login incorrecto Dentista",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n  \"email\": \"dentist1@dentia.local\",\r\n  \"password\": \"wrong*\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "http://localhost:3000/auth/login",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "auth",
+                "login"
+              ]
+            }
+          },
+          "status": "Unauthorized",
+          "code": 401,
+          "_postman_previewlanguage": null,
+          "header": [
+            {
+              "key": "X-Powered-By",
+              "value": "Express"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json; charset=utf-8"
+            },
+            {
+              "key": "Content-Length",
+              "value": "77"
+            },
+            {
+              "key": "ETag",
+              "value": "W/\"4d-Wtkv+T/MWN4290jcIjb0Fr2crac\""
+            },
+            {
+              "key": "Date",
+              "value": "Fri, 08 May 2026 09:25:20 GMT"
+            },
+            {
+              "key": "Connection",
+              "value": "keep-alive"
+            },
+            {
+              "key": "Keep-Alive",
+              "value": "timeout=5"
+            }
+          ],
+          "cookie": [],
+          "body": "{\n    \"message\": \"Credenciales inválidas\",\n    \"error\": \"Unauthorized\",\n    \"statusCode\": 401\n}"
+        },
+        {
+          "name": "Login Paciente",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n  \"email\": \"patient1@dentia.local\",\r\n  \"password\": \"Patient123*\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "http://localhost:3000/auth/login",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "auth",
+                "login"
+              ]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": null,
+          "header": [
+            {
+              "key": "X-Powered-By",
+              "value": "Express"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json; charset=utf-8"
+            },
+            {
+              "key": "Content-Length",
+              "value": "455"
+            },
+            {
+              "key": "ETag",
+              "value": "W/\"1c7-xgG5wV10NVhEGiO7QgXWGPhhBrw\""
+            },
+            {
+              "key": "Date",
+              "value": "Fri, 08 May 2026 09:29:38 GMT"
+            },
+            {
+              "key": "Connection",
+              "value": "keep-alive"
+            },
+            {
+              "key": "Keep-Alive",
+              "value": "timeout=5"
+            }
+          ],
+          "cookie": [],
+          "body": "{\n    \"accessToken\": \"{{accessToken}}\",\n    \"user\": {\n        \"id\": \"06d17928-a7a1-46d0-97d7-135c8941c18c\",\n        \"email\": \"patient1@dentia.local\",\n        \"role\": \"PATIENT\",\n        \"domainId\": \"p1\",\n        \"fullName\": \"Paciente Demo\",\n        \"specialty\": null\n    }\n}"
+        },
+        {
+          "name": "Login incorrecto Paciente",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n  \"email\": \"patient1@dentia.local\",\r\n  \"password\": \"wrong*\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "http://localhost:3000/auth/login",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "auth",
+                "login"
+              ]
+            }
+          },
+          "status": "Unauthorized",
+          "code": 401,
+          "_postman_previewlanguage": null,
+          "header": [
+            {
+              "key": "X-Powered-By",
+              "value": "Express"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json; charset=utf-8"
+            },
+            {
+              "key": "Content-Length",
+              "value": "77"
+            },
+            {
+              "key": "ETag",
+              "value": "W/\"4d-Wtkv+T/MWN4290jcIjb0Fr2crac\""
+            },
+            {
+              "key": "Date",
+              "value": "Fri, 08 May 2026 09:30:45 GMT"
+            },
+            {
+              "key": "Connection",
+              "value": "keep-alive"
+            },
+            {
+              "key": "Keep-Alive",
+              "value": "timeout=5"
+            }
+          ],
+          "cookie": [],
+          "body": "{\n    \"message\": \"Credenciales inválidas\",\n    \"error\": \"Unauthorized\",\n    \"statusCode\": 401\n}"
+        }
+      ]
+    },
+    {
+      "name": "Prescriptions",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{accessToken}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:3000/prescriptions/66c0cfde-6ebc-4f59-9cfd-873bd22cd40f",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "3000",
+          "path": [
+            "prescriptions",
+            "66c0cfde-6ebc-4f59-9cfd-873bd22cd40f"
+          ]
+        }
+      },
+      "response": [
+        {
+          "name": "Crear receta",
+          "originalRequest": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n  \"appointmentId\": \"<appointmentId>\",\r\n  \"patientId\": \"p1\",\r\n  \"dentistId\": \"d1\",\r\n  \"diagnosis\": \"Gingivitis leve\",\r\n  \"indications\": \"Cepillado tres veces al día y uso de hilo dental.\",\r\n  \"notes\": \"Revisión en dos semanas.\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "http://localhost:3000/prescriptions",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "prescriptions"
+              ]
+            }
+          },
+          "status": "Created",
+          "code": 201,
+          "_postman_previewlanguage": null,
+          "header": [
+            {
+              "key": "X-Powered-By",
+              "value": "Express"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json; charset=utf-8"
+            },
+            {
+              "key": "Content-Length",
+              "value": "342"
+            },
+            {
+              "key": "ETag",
+              "value": "W/\"156-t9S67nQ3Edr+NDywCKTFXMzVq0Y\""
+            },
+            {
+              "key": "Date",
+              "value": "Fri, 08 May 2026 09:51:45 GMT"
+            },
+            {
+              "key": "Connection",
+              "value": "keep-alive"
+            },
+            {
+              "key": "Keep-Alive",
+              "value": "timeout=5"
+            }
+          ],
+          "cookie": [],
+          "body": "{\n    \"id\": \"21646267-2785-4b82-90cb-01d9cd0e46bf\",\n    \"appointmentId\": \"<appointmentId>\",\n    \"patientId\": \"p1\",\n    \"dentistId\": \"d1\",\n    \"diagnosis\": \"Gingivitis leve\",\n    \"indications\": \"Cepillado tres veces al día y uso de hilo dental.\",\n    \"notes\": \"Revisión en dos semanas.\",\n    \"status\": \"ACTIVE\",\n    \"createdAt\": \"2026-05-08T09:51:45.617Z\",\n    \"updatedAt\": \"2026-05-08T09:51:45.617Z\"\n}"
+        },
+        {
+          "name": "Consultar receta por ID",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3000/prescriptions/21646267-2785-4b82-90cb-01d9cd0e46bf",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "prescriptions",
+                "21646267-2785-4b82-90cb-01d9cd0e46bf"
+              ]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": null,
+          "header": [
+            {
+              "key": "X-Powered-By",
+              "value": "Express"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json; charset=utf-8"
+            },
+            {
+              "key": "Content-Length",
+              "value": "342"
+            },
+            {
+              "key": "ETag",
+              "value": "W/\"156-t9S67nQ3Edr+NDywCKTFXMzVq0Y\""
+            },
+            {
+              "key": "Date",
+              "value": "Fri, 08 May 2026 09:52:36 GMT"
+            },
+            {
+              "key": "Connection",
+              "value": "keep-alive"
+            },
+            {
+              "key": "Keep-Alive",
+              "value": "timeout=5"
+            }
+          ],
+          "cookie": [],
+          "body": "{\n    \"id\": \"21646267-2785-4b82-90cb-01d9cd0e46bf\",\n    \"appointmentId\": \"<appointmentId>\",\n    \"patientId\": \"p1\",\n    \"dentistId\": \"d1\",\n    \"diagnosis\": \"Gingivitis leve\",\n    \"indications\": \"Cepillado tres veces al día y uso de hilo dental.\",\n    \"notes\": \"Revisión en dos semanas.\",\n    \"status\": \"ACTIVE\",\n    \"createdAt\": \"2026-05-08T09:51:45.617Z\",\n    \"updatedAt\": \"2026-05-08T09:51:45.617Z\"\n}"
+        },
+        {
+          "name": "Consultar recetas por citas",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3000/appointments/21646267-2785-4b82-90cb-01d9cd0e46bf/prescriptions",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "appointments",
+                "21646267-2785-4b82-90cb-01d9cd0e46bf",
+                "prescriptions"
+              ]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": null,
+          "header": [
+            {
+              "key": "X-Powered-By",
+              "value": "Express"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json; charset=utf-8"
+            },
+            {
+              "key": "Content-Length",
+              "value": "2"
+            },
+            {
+              "key": "ETag",
+              "value": "W/\"2-l9Fw4VUO7kr8CvBlt4zaMCqXZ0w\""
+            },
+            {
+              "key": "Date",
+              "value": "Fri, 08 May 2026 09:53:49 GMT"
+            },
+            {
+              "key": "Connection",
+              "value": "keep-alive"
+            },
+            {
+              "key": "Keep-Alive",
+              "value": "timeout=5"
+            }
+          ],
+          "cookie": [],
+          "body": "[]"
+        }
+      ]
+    },
+    {
+      "name": "Appointments",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{accessToken}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:3000/appointments/a1/prescriptions",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "3000",
+          "path": [
+            "appointments",
+            "a1",
+            "prescriptions"
+          ]
+        }
+      },
+      "response": [
+        {
+          "name": "Disponibilidad",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3000/appointments/availability?dentistId=d1&date=2026-05-08",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "appointments",
+                "availability"
+              ],
+              "query": [
+                {
+                  "key": "dentistId",
+                  "value": "d1"
+                },
+                {
+                  "key": "date",
+                  "value": "2026-05-08"
+                }
+              ]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": null,
+          "header": [
+            {
+              "key": "X-Powered-By",
+              "value": "Express"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json; charset=utf-8"
+            },
+            {
+              "key": "Content-Length",
+              "value": "776"
+            },
+            {
+              "key": "ETag",
+              "value": "W/\"308-rmt7lH6hDnXQ+lqkGX9JHDIT6nw\""
+            },
+            {
+              "key": "Date",
+              "value": "Fri, 08 May 2026 09:40:28 GMT"
+            },
+            {
+              "key": "Connection",
+              "value": "keep-alive"
+            },
+            {
+              "key": "Keep-Alive",
+              "value": "timeout=5"
+            }
+          ],
+          "cookie": [],
+          "body": "{\n    \"dentistId\": \"d1\",\n    \"date\": \"2026-05-08\",\n    \"slots\": [\n        {\n            \"startAt\": \"2026-05-08T09:00:00.000Z\",\n            \"endAt\": \"2026-05-08T10:00:00.000Z\",\n            \"available\": true\n        },\n        {\n            \"startAt\": \"2026-05-08T10:00:00.000Z\",\n            \"endAt\": \"2026-05-08T11:00:00.000Z\",\n            \"available\": true\n        },\n        {\n            \"startAt\": \"2026-05-08T11:00:00.000Z\",\n            \"endAt\": \"2026-05-08T12:00:00.000Z\",\n            \"available\": true\n        },\n        {\n            \"startAt\": \"2026-05-08T12:00:00.000Z\",\n            \"endAt\": \"2026-05-08T13:00:00.000Z\",\n            \"available\": true\n        },\n        {\n            \"startAt\": \"2026-05-08T13:00:00.000Z\",\n            \"endAt\": \"2026-05-08T14:00:00.000Z\",\n            \"available\": true\n        },\n        {\n            \"startAt\": \"2026-05-08T14:00:00.000Z\",\n            \"endAt\": \"2026-05-08T15:00:00.000Z\",\n            \"available\": true\n        },\n        {\n            \"startAt\": \"2026-05-08T15:00:00.000Z\",\n            \"endAt\": \"2026-05-08T16:00:00.000Z\",\n            \"available\": true\n        },\n        {\n            \"startAt\": \"2026-05-08T16:00:00.000Z\",\n            \"endAt\": \"2026-05-08T17:00:00.000Z\",\n            \"available\": true\n        }\n    ]\n}"
+        },
+        {
+          "name": "Crear cita",
+          "originalRequest": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n  \"patientId\": \"p1\",\r\n  \"dentistId\": \"d1\",\r\n  \"startAt\": \"2026-05-08T16:00:00.000Z\",\r\n  \"endAt\": \"2026-05-08T16:30:00.000Z\",\r\n  \"reason\": \"Limpieza dental\",\r\n  \"notes\": \"Primera visita\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "http://localhost:3000/appointments",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "appointments"
+              ]
+            }
+          },
+          "status": "Created",
+          "code": 201,
+          "_postman_previewlanguage": null,
+          "header": [
+            {
+              "key": "X-Powered-By",
+              "value": "Express"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json; charset=utf-8"
+            },
+            {
+              "key": "Content-Length",
+              "value": "300"
+            },
+            {
+              "key": "ETag",
+              "value": "W/\"12c-BM/FW/tzW+ZiPh14z76XFmWgS7I\""
+            },
+            {
+              "key": "Date",
+              "value": "Fri, 08 May 2026 09:41:44 GMT"
+            },
+            {
+              "key": "Connection",
+              "value": "keep-alive"
+            },
+            {
+              "key": "Keep-Alive",
+              "value": "timeout=5"
+            }
+          ],
+          "cookie": [],
+          "body": "{\n    \"id\": \"fd58a470-3e68-4c8b-bfe9-e6bed9bd4ca4\",\n    \"patientId\": \"p1\",\n    \"dentistId\": \"d1\",\n    \"startAt\": \"2026-05-08T16:00:00.000Z\",\n    \"endAt\": \"2026-05-08T16:30:00.000Z\",\n    \"status\": \"PENDING\",\n    \"reason\": \"Limpieza dental\",\n    \"notes\": \"Primera visita\",\n    \"createdAt\": \"2026-05-08T09:41:44.051Z\",\n    \"updatedAt\": \"2026-05-08T09:41:44.051Z\"\n}"
+        },
+        {
+          "name": "Listar citas",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3000/appointments",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "appointments"
+              ]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": null,
+          "header": [
+            {
+              "key": "X-Powered-By",
+              "value": "Express"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json; charset=utf-8"
+            },
+            {
+              "key": "Content-Length",
+              "value": "302"
+            },
+            {
+              "key": "ETag",
+              "value": "W/\"12e-roaDZ7I48wyOAqyuf6/pdgPMeEI\""
+            },
+            {
+              "key": "Date",
+              "value": "Fri, 08 May 2026 09:43:14 GMT"
+            },
+            {
+              "key": "Connection",
+              "value": "keep-alive"
+            },
+            {
+              "key": "Keep-Alive",
+              "value": "timeout=5"
+            }
+          ],
+          "cookie": [],
+          "body": "[\n    {\n        \"id\": \"fd58a470-3e68-4c8b-bfe9-e6bed9bd4ca4\",\n        \"patientId\": \"p1\",\n        \"dentistId\": \"d1\",\n        \"startAt\": \"2026-05-08T16:00:00.000Z\",\n        \"endAt\": \"2026-05-08T16:30:00.000Z\",\n        \"status\": \"PENDING\",\n        \"reason\": \"Limpieza dental\",\n        \"notes\": \"Primera visita\",\n        \"createdAt\": \"2026-05-08T09:41:44.051Z\",\n        \"updatedAt\": \"2026-05-08T09:41:44.051Z\"\n    }\n]"
+        },
+        {
+          "name": "Consultar cita por ID",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3000/appointments/fd58a470-3e68-4c8b-bfe9-e6bed9bd4ca4",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "appointments",
+                "fd58a470-3e68-4c8b-bfe9-e6bed9bd4ca4"
+              ]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": null,
+          "header": [
+            {
+              "key": "X-Powered-By",
+              "value": "Express"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json; charset=utf-8"
+            },
+            {
+              "key": "Content-Length",
+              "value": "300"
+            },
+            {
+              "key": "ETag",
+              "value": "W/\"12c-BM/FW/tzW+ZiPh14z76XFmWgS7I\""
+            },
+            {
+              "key": "Date",
+              "value": "Fri, 08 May 2026 09:44:18 GMT"
+            },
+            {
+              "key": "Connection",
+              "value": "keep-alive"
+            },
+            {
+              "key": "Keep-Alive",
+              "value": "timeout=5"
+            }
+          ],
+          "cookie": [],
+          "body": "{\n    \"id\": \"fd58a470-3e68-4c8b-bfe9-e6bed9bd4ca4\",\n    \"patientId\": \"p1\",\n    \"dentistId\": \"d1\",\n    \"startAt\": \"2026-05-08T16:00:00.000Z\",\n    \"endAt\": \"2026-05-08T16:30:00.000Z\",\n    \"status\": \"PENDING\",\n    \"reason\": \"Limpieza dental\",\n    \"notes\": \"Primera visita\",\n    \"createdAt\": \"2026-05-08T09:41:44.051Z\",\n    \"updatedAt\": \"2026-05-08T09:41:44.051Z\"\n}"
+        },
+        {
+          "name": "Reprogramar cita",
+          "originalRequest": {
+            "method": "PATCH",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n  \"startAt\": \"2026-05-08T17:00:00.000Z\",\r\n  \"endAt\": \"2026-05-08T17:30:00.000Z\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "http://localhost:3000/appointments/fd58a470-3e68-4c8b-bfe9-e6bed9bd4ca4/reschedule",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "appointments",
+                "fd58a470-3e68-4c8b-bfe9-e6bed9bd4ca4",
+                "reschedule"
+              ]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": null,
+          "header": [
+            {
+              "key": "X-Powered-By",
+              "value": "Express"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json; charset=utf-8"
+            },
+            {
+              "key": "Content-Length",
+              "value": "300"
+            },
+            {
+              "key": "ETag",
+              "value": "W/\"12c-MHSIfVZ/pHvH78Ed9HKhj05n3js\""
+            },
+            {
+              "key": "Date",
+              "value": "Fri, 08 May 2026 09:48:27 GMT"
+            },
+            {
+              "key": "Connection",
+              "value": "keep-alive"
+            },
+            {
+              "key": "Keep-Alive",
+              "value": "timeout=5"
+            }
+          ],
+          "cookie": [],
+          "body": "{\n    \"id\": \"fd58a470-3e68-4c8b-bfe9-e6bed9bd4ca4\",\n    \"patientId\": \"p1\",\n    \"dentistId\": \"d1\",\n    \"startAt\": \"2026-05-08T17:00:00.000Z\",\n    \"endAt\": \"2026-05-08T17:30:00.000Z\",\n    \"status\": \"PENDING\",\n    \"reason\": \"Limpieza dental\",\n    \"notes\": \"Primera visita\",\n    \"createdAt\": \"2026-05-08T09:41:44.051Z\",\n    \"updatedAt\": \"2026-05-08T09:48:27.664Z\"\n}"
+        },
+        {
+          "name": "Confirmar cita",
+          "originalRequest": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3000/appointments/fd58a470-3e68-4c8b-bfe9-e6bed9bd4ca4/confirm",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "appointments",
+                "fd58a470-3e68-4c8b-bfe9-e6bed9bd4ca4",
+                "confirm"
+              ]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": null,
+          "header": [
+            {
+              "key": "X-Powered-By",
+              "value": "Express"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json; charset=utf-8"
+            },
+            {
+              "key": "Content-Length",
+              "value": "302"
+            },
+            {
+              "key": "ETag",
+              "value": "W/\"12e-k30LKchReZHT8oQfChm79kmx9LU\""
+            },
+            {
+              "key": "Date",
+              "value": "Fri, 08 May 2026 09:49:41 GMT"
+            },
+            {
+              "key": "Connection",
+              "value": "keep-alive"
+            },
+            {
+              "key": "Keep-Alive",
+              "value": "timeout=5"
+            }
+          ],
+          "cookie": [],
+          "body": "{\n    \"id\": \"fd58a470-3e68-4c8b-bfe9-e6bed9bd4ca4\",\n    \"patientId\": \"p1\",\n    \"dentistId\": \"d1\",\n    \"startAt\": \"2026-05-08T17:00:00.000Z\",\n    \"endAt\": \"2026-05-08T17:30:00.000Z\",\n    \"status\": \"CONFIRMED\",\n    \"reason\": \"Limpieza dental\",\n    \"notes\": \"Primera visita\",\n    \"createdAt\": \"2026-05-08T09:41:44.051Z\",\n    \"updatedAt\": \"2026-05-08T09:49:41.239Z\"\n}"
+        },
+        {
+          "name": "Completar cita",
+          "originalRequest": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3000/appointments/fd58a470-3e68-4c8b-bfe9-e6bed9bd4ca4/complete",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "appointments",
+                "fd58a470-3e68-4c8b-bfe9-e6bed9bd4ca4",
+                "complete"
+              ]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": null,
+          "header": [
+            {
+              "key": "X-Powered-By",
+              "value": "Express"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json; charset=utf-8"
+            },
+            {
+              "key": "Content-Length",
+              "value": "302"
+            },
+            {
+              "key": "ETag",
+              "value": "W/\"12e-1ZgMoYu3u2pe3vUnOM5KyiiQtkY\""
+            },
+            {
+              "key": "Date",
+              "value": "Fri, 08 May 2026 09:50:19 GMT"
+            },
+            {
+              "key": "Connection",
+              "value": "keep-alive"
+            },
+            {
+              "key": "Keep-Alive",
+              "value": "timeout=5"
+            }
+          ],
+          "cookie": [],
+          "body": "{\n    \"id\": \"fd58a470-3e68-4c8b-bfe9-e6bed9bd4ca4\",\n    \"patientId\": \"p1\",\n    \"dentistId\": \"d1\",\n    \"startAt\": \"2026-05-08T17:00:00.000Z\",\n    \"endAt\": \"2026-05-08T17:30:00.000Z\",\n    \"status\": \"COMPLETED\",\n    \"reason\": \"Limpieza dental\",\n    \"notes\": \"Primera visita\",\n    \"createdAt\": \"2026-05-08T09:41:44.051Z\",\n    \"updatedAt\": \"2026-05-08T09:50:19.853Z\"\n}"
+        },
+        {
+          "name": "Sin token",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3000/appointments",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "appointments"
+              ]
+            }
+          },
+          "status": "Unauthorized",
+          "code": 401,
+          "_postman_previewlanguage": null,
+          "header": [
+            {
+              "key": "X-Powered-By",
+              "value": "Express"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json; charset=utf-8"
+            },
+            {
+              "key": "Content-Length",
+              "value": "69"
+            },
+            {
+              "key": "ETag",
+              "value": "W/\"45-2vXyz+1H9rroAw0aLZPxS6Lp+cw\""
+            },
+            {
+              "key": "Date",
+              "value": "Fri, 08 May 2026 09:58:55 GMT"
+            },
+            {
+              "key": "Connection",
+              "value": "keep-alive"
+            },
+            {
+              "key": "Keep-Alive",
+              "value": "timeout=5"
+            }
+          ],
+          "cookie": [],
+          "body": "{\n    \"message\": \"Token requerido\",\n    \"error\": \"Unauthorized\",\n    \"statusCode\": 401\n}"
+        },
+        {
+          "name": "Paciente intentando confirmar cita",
+          "originalRequest": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3000/appointments/fd58a470-3e68-4c8b-bfe9-e6bed9bd4ca4/confirm",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "appointments",
+                "fd58a470-3e68-4c8b-bfe9-e6bed9bd4ca4",
+                "confirm"
+              ]
+            }
+          },
+          "status": "Forbidden",
+          "code": 403,
+          "_postman_previewlanguage": null,
+          "header": [
+            {
+              "key": "X-Powered-By",
+              "value": "Express"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json; charset=utf-8"
+            },
+            {
+              "key": "Content-Length",
+              "value": "64"
+            },
+            {
+              "key": "ETag",
+              "value": "W/\"40-L4BvE4KstYh1ylAZVQHKnSJZS1w\""
+            },
+            {
+              "key": "Date",
+              "value": "Fri, 08 May 2026 10:02:03 GMT"
+            },
+            {
+              "key": "Connection",
+              "value": "keep-alive"
+            },
+            {
+              "key": "Keep-Alive",
+              "value": "timeout=5"
+            }
+          ],
+          "cookie": [],
+          "body": "{\n    \"message\": \"No autorizado\",\n    \"error\": \"Forbidden\",\n    \"statusCode\": 403\n}"
+        }
+      ]
+    },
+    {
+      "name": "Dentists",
+      "request": {
+        "method": "GET",
+        "header": []
+      },
+      "response": [
+        {
+          "name": "Listar Dentistas",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3000/dentists",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "dentists"
+              ]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": null,
+          "header": [
+            {
+              "key": "X-Powered-By",
+              "value": "Express"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json; charset=utf-8"
+            },
+            {
+              "key": "Content-Length",
+              "value": "160"
+            },
+            {
+              "key": "ETag",
+              "value": "W/\"a0-+eXPU3/KbiALQIHEeIUR6cvX5RQ\""
+            },
+            {
+              "key": "Date",
+              "value": "Fri, 08 May 2026 09:37:37 GMT"
+            },
+            {
+              "key": "Connection",
+              "value": "keep-alive"
+            },
+            {
+              "key": "Keep-Alive",
+              "value": "timeout=5"
+            }
+          ],
+          "cookie": [],
+          "body": "[\n    {\n        \"id\": \"147063ae-bba2-42f4-8d1f-8b1ba988bdc6\",\n        \"domainId\": \"d1\",\n        \"fullName\": \"Dra. Demo Dentia\",\n        \"specialty\": \"Odontología general\",\n        \"email\": \"dentist1@dentia.local\"\n    }\n]"
+        },
+        {
+          "name": "Consultar Dentista",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3000/dentists/d1",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "dentists",
+                "d1"
+              ]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": null,
+          "header": [
+            {
+              "key": "X-Powered-By",
+              "value": "Express"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json; charset=utf-8"
+            },
+            {
+              "key": "Content-Length",
+              "value": "158"
+            },
+            {
+              "key": "ETag",
+              "value": "W/\"9e-4V18ky+8Ks4w+qldarf+CoorCxw\""
+            },
+            {
+              "key": "Date",
+              "value": "Fri, 08 May 2026 09:38:24 GMT"
+            },
+            {
+              "key": "Connection",
+              "value": "keep-alive"
+            },
+            {
+              "key": "Keep-Alive",
+              "value": "timeout=5"
+            }
+          ],
+          "cookie": [],
+          "body": "{\n    \"id\": \"147063ae-bba2-42f4-8d1f-8b1ba988bdc6\",\n    \"domainId\": \"d1\",\n    \"fullName\": \"Dra. Demo Dentia\",\n    \"specialty\": \"Odontología general\",\n    \"email\": \"dentist1@dentia.local\"\n}"
+        }
+      ]
+    },
+    {
+      "name": "Profile",
+      "request": {
+        "method": "GET",
+        "header": []
+      },
+      "response": [
+        {
+          "name": "Cuenta registrada",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3000/profile",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3000",
+              "path": [
+                "profile"
+              ]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": null,
+          "header": [
+            {
+              "key": "X-Powered-By",
+              "value": "Express"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json; charset=utf-8"
+            },
+            {
+              "key": "Content-Length",
+              "value": "154"
+            },
+            {
+              "key": "ETag",
+              "value": "W/\"9a-lYdaPEoh471FibphbiI8F4KzDOI\""
+            },
+            {
+              "key": "Date",
+              "value": "Fri, 08 May 2026 09:34:33 GMT"
+            },
+            {
+              "key": "Connection",
+              "value": "keep-alive"
+            },
+            {
+              "key": "Keep-Alive",
+              "value": "timeout=5"
+            }
+          ],
+          "cookie": [],
+          "body": "{\n    \"id\": \"06d17928-a7a1-46d0-97d7-135c8941c18c\",\n    \"email\": \"patient1@dentia.local\",\n    \"role\": \"PATIENT\",\n    \"domainId\": \"p1\",\n    \"fullName\": \"Paciente Demo\",\n    \"specialty\": null\n}"
+        }
+      ]
+    }
+  ]
+}

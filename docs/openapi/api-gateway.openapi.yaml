@@ -1,0 +1,459 @@
+openapi: 3.1.0
+
+info:
+  title: Dentia API Gateway
+  version: 0.1.0
+  description: >
+    Contrato OpenAPI inicial basado únicamente en los endpoints existentes
+    actualmente en el API Gateway.
+
+servers:
+  - url: http://localhost:3000
+    description: API Gateway local
+
+tags:
+  - name: Auth
+  - name: Profile
+  - name: Dentists
+  - name: Appointments
+  - name: Prescriptions
+
+paths:
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Registrar paciente
+      operationId: registerPatient
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+            example:
+              fullName: Manuel Valdivia
+              email: manuel@example.com
+              password: Password123
+      responses:
+        '201':
+          description: Usuario registrado correctamente
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          description: El correo ya está registrado
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Iniciar sesión
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            example:
+              email: manuel@example.com
+              password: Password123
+      responses:
+        '200':
+          description: Login correcto
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /profile:
+    get:
+      tags: [Profile]
+      summary: Obtener perfil autenticado
+      operationId: getProfile
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Perfil del usuario autenticado
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /dentists:
+    get:
+      tags: [Dentists]
+      summary: Listar dentistas
+      operationId: listDentists
+      responses:
+        '200':
+          description: Lista de dentistas
+
+  /dentists/{domainId}:
+    get:
+      tags: [Dentists]
+      summary: Consultar dentista por domainId
+      operationId: getDentistByDomainId
+      parameters:
+        - name: domainId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Dentista encontrado
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /appointments:
+    get:
+      tags: [Appointments]
+      summary: Listar citas visibles
+      operationId: listAppointments
+      security:
+        - bearerAuth: []
+      x-roles: [ADMIN, PATIENT, DENTIST]
+      responses:
+        '200':
+          description: Lista de citas
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    post:
+      tags: [Appointments]
+      summary: Crear cita
+      operationId: createAppointment
+      security:
+        - bearerAuth: []
+      x-roles: [ADMIN, PATIENT]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAppointmentRequest'
+            example:
+              patientId: patient-uuid
+              dentistId: dentist-uuid
+              startAt: "2026-05-08T16:00:00.000Z"
+              endAt: "2026-05-08T16:30:00.000Z"
+              reason: Limpieza dental
+              notes: Primera visita
+      responses:
+        '201':
+          description: Cita creada correctamente
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Horario no disponible o empalmado
+
+  /appointments/availability:
+    get:
+      tags: [Appointments]
+      summary: Consultar disponibilidad
+      operationId: getAppointmentAvailability
+      security:
+        - bearerAuth: []
+      x-roles: [ADMIN, PATIENT, DENTIST]
+      parameters:
+        - name: dentistId
+          in: query
+          required: true
+          schema:
+            type: string
+          example: dentist-uuid
+        - name: date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+          example: "2026-05-08"
+      responses:
+        '200':
+          description: Disponibilidad del dentista
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /appointments/{id}:
+    get:
+      tags: [Appointments]
+      summary: Consultar cita por ID
+      operationId: getAppointmentById
+      security:
+        - bearerAuth: []
+      x-roles: [ADMIN, PATIENT, DENTIST]
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: Cita encontrada
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /appointments/{id}/reschedule:
+    patch:
+      tags: [Appointments]
+      summary: Reprogramar cita
+      operationId: rescheduleAppointment
+      security:
+        - bearerAuth: []
+      x-roles: [ADMIN, PATIENT]
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RescheduleAppointmentRequest'
+            example:
+              startAt: "2026-05-08T17:00:00.000Z"
+              endAt: "2026-05-08T17:30:00.000Z"
+      responses:
+        '200':
+          description: Cita reprogramada
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Nuevo horario no disponible
+
+  /appointments/{id}/cancel:
+    patch:
+      tags: [Appointments]
+      summary: Cancelar cita
+      operationId: cancelAppointment
+      security:
+        - bearerAuth: []
+      x-roles: [ADMIN, PATIENT, DENTIST]
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: Cita cancelada
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /appointments/{id}/confirm:
+    patch:
+      tags: [Appointments]
+      summary: Confirmar cita
+      operationId: confirmAppointment
+      security:
+        - bearerAuth: []
+      x-roles: [ADMIN, DENTIST]
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: Cita confirmada
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /appointments/{id}/complete:
+    patch:
+      tags: [Appointments]
+      summary: Completar cita
+      operationId: completeAppointment
+      security:
+        - bearerAuth: []
+      x-roles: [ADMIN, DENTIST]
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: Cita completada
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /prescriptions:
+    post:
+      tags: [Prescriptions]
+      summary: Crear receta
+      operationId: createPrescription
+      security:
+        - bearerAuth: []
+      x-roles: [ADMIN, DENTIST]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePrescriptionRequest'
+            example:
+              appointmentId: appointment-uuid
+              patientId: patient-uuid
+              dentistId: dentist-uuid
+              diagnosis: Gingivitis leve
+              indications: Cepillado tres veces al día
+              notes: Revisión en dos semanas
+      responses:
+        '201':
+          description: Receta creada correctamente
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /prescriptions/{id}:
+    get:
+      tags: [Prescriptions]
+      summary: Consultar receta por ID
+      operationId: getPrescriptionById
+      security:
+        - bearerAuth: []
+      x-roles: [ADMIN, DENTIST, PATIENT]
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: Receta encontrada
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /appointments/{appointmentId}/prescriptions:
+    get:
+      tags: [Prescriptions]
+      summary: Listar recetas de una cita
+      operationId: listPrescriptionsByAppointment
+      security:
+        - bearerAuth: []
+      x-roles: [ADMIN, DENTIST, PATIENT]
+      parameters:
+        - name: appointmentId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: appointment-uuid
+      responses:
+        '200':
+          description: Recetas vinculadas a la cita
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      example: resource-uuid
+
+  responses:
+    BadRequest:
+      description: Datos inválidos o falla de validación
+
+    Unauthorized:
+      description: Token JWT no enviado, inválido o expirado
+
+    Forbidden:
+      description: El rol no tiene permisos o el recurso no pertenece al usuario
+
+    NotFound:
+      description: Recurso no encontrado
+
+  schemas:
+    RegisterRequest:
+      type: object
+      required: [email, password, fullName]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+        fullName:
+          type: string
+          minLength: 3
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 6
+
+    CreateAppointmentRequest:
+      type: object
+      required: [patientId, dentistId, startAt, endAt]
+      properties:
+        patientId:
+          type: string
+        dentistId:
+          type: string
+        startAt:
+          type: string
+          format: date-time
+        endAt:
+          type: string
+          format: date-time
+        reason:
+          type: string
+        notes:
+          type: string
+
+    RescheduleAppointmentRequest:
+      type: object
+      required: [startAt, endAt]
+      properties:
+        startAt:
+          type: string
+          format: date-time
+        endAt:
+          type: string
+          format: date-time
+
+    CreatePrescriptionRequest:
+      type: object
+      required: [appointmentId, patientId, dentistId, diagnosis, indications]
+      properties:
+        appointmentId:
+          type: string
+        patientId:
+          type: string
+        dentistId:
+          type: string
+        diagnosis:
+          type: string
+        indications:
+          type: string
+        notes:
+          type: string
