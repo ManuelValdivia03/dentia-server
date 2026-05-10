@@ -18,6 +18,22 @@ services:
       timeout: 5s
       retries: 5
 
+  rabbitmq:
+    image: rabbitmq:4-management
+    container_name: dentia-rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: dentia
+      RABBITMQ_DEFAULT_PASS: dentia123
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   auth-service:
     build:
       context: ./auth-service
@@ -53,13 +69,17 @@ services:
       DB_USER: ${POSTGRES_USER}
       DB_PASSWORD: ${POSTGRES_PASSWORD}
       DB_NAME: ${POSTGRES_APPOINTMENTS_DB}
+      RABBITMQ_URL: ${RABBITMQ_URL}
+      RABBITMQ_QUEUE_APPOINTMENTS: ${RABBITMQ_QUEUE_APPOINTMENTS}
     depends_on:
       postgres:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     ports:
       - "${APPOINTMENTS_HTTP_PORT}:3002"
       - "${APPOINTMENTS_TCP_PORT}:${APPOINTMENTS_TCP_PORT}"
-  
+
   prescriptions-service:
     build:
       context: ./prescriptions-service

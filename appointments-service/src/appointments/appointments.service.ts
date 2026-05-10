@@ -10,6 +10,7 @@ import { Appointment } from './entities/appointment.entity';
 import { AppointmentStatus } from './enums/appointment-status.enum';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
 import { RescheduleAppointmentDto } from './dto/reschedule-appointment.dto';
+import { EventsPublisher } from '../events/events.publisher';
 import { RequestUser, RequestUserRole } from './interfaces/request-user.interface';
 
 @Injectable()
@@ -17,6 +18,7 @@ export class AppointmentsService {
   constructor(
     @InjectRepository(Appointment)
     private readonly appointmentsRepository: Repository<Appointment>,
+    private readonly eventsPublisher: EventsPublisher,
   ) {}
 
   async findAll(requester: RequestUser) {
@@ -48,7 +50,9 @@ export class AppointmentsService {
       requester.role === RequestUserRole.DENTIST &&
       dentistId !== requester.domainId
     ) {
-      throw new ForbiddenException('No puedes consultar disponibilidad de otro dentista');
+      throw new ForbiddenException(
+        'No puedes consultar disponibilidad de otro dentista',
+      );
     }
 
     const dayStart = new Date(`${date}T00:00:00.000Z`);
@@ -70,12 +74,18 @@ export class AppointmentsService {
       .getMany();
 
     const slots: { startAt: Date; endAt: Date; available: boolean }[] = [];
+
     for (let hour = 9; hour < 17; hour++) {
-      const startAt = new Date(`${date}T${String(hour).padStart(2, '0')}:00:00.000Z`);
-      const endAt = new Date(`${date}T${String(hour + 1).padStart(2, '0')}:00:00.000Z`);
+      const startAt = new Date(
+        `${date}T${String(hour).padStart(2, '0')}:00:00.000Z`,
+      );
+      const endAt = new Date(
+        `${date}T${String(hour + 1).padStart(2, '0')}:00:00.000Z`,
+      );
 
       const occupied = appointments.some(
-        (appointment) => appointment.startAt < endAt && appointment.endAt > startAt,
+        (appointment) =>
+          appointment.startAt < endAt && appointment.endAt > startAt,
       );
 
       slots.push({
@@ -116,10 +126,25 @@ export class AppointmentsService {
       status: AppointmentStatus.PENDING,
     });
 
-    return this.appointmentsRepository.save(appointment);
+    const savedAppointment = await this.appointmentsRepository.save(appointment);
+
+    await this.eventsPublisher.publishAppointmentCreated({
+      appointmentId: savedAppointment.id,
+      patientId: savedAppointment.patientId,
+      dentistId: savedAppointment.dentistId,
+      startAt: savedAppointment.startAt.toISOString(),
+      endAt: savedAppointment.endAt.toISOString(),
+      status: savedAppointment.status,
+    });
+
+    return savedAppointment;
   }
 
-  async reschedule(id: string, dto: RescheduleAppointmentDto, requester: RequestUser) {
+  async reschedule(
+    id: string,
+    dto: RescheduleAppointmentDto,
+    requester: RequestUser,
+  ) {
     const appointment = await this.findByIdOrFail(id);
     this.ensurePatientOrAdminCanManage(appointment, requester);
 
@@ -127,7 +152,12 @@ export class AppointmentsService {
     const endAt = new Date(dto.endAt);
 
     this.validateRange(startAt, endAt);
-    await this.ensureNoOverlap(appointment.dentistId, startAt, endAt, appointment.id);
+    await this.ensureNoOverlap(
+      appointment.dentistId,
+      startAt,
+      endAt,
+      appointment.id,
+    );
 
     appointment.startAt = startAt;
     appointment.endAt = endAt;
@@ -211,7 +241,9 @@ export class AppointmentsService {
     const overlapping = await query.getOne();
 
     if (overlapping) {
-      throw new BadRequestException('El dentista ya tiene una cita en ese horario');
+      throw new BadRequestException(
+        'El dentista ya tiene una cita en ese horario',
+      );
     }
   }
 
@@ -253,7 +285,10 @@ export class AppointmentsService {
     throw new ForbiddenException('No puedes reprogramar esta cita');
   }
 
-  private ensureCanCancelAppointment(appointment: Appointment, requester: RequestUser) {
+  private ensureCanCancelAppointment(
+    appointment: Appointment,
+    requester: RequestUser,
+  ) {
     if (requester.role === RequestUserRole.ADMIN) {
       return;
     }
