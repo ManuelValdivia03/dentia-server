@@ -1,0 +1,778 @@
+{
+  "info": {
+    "_postman_id": "aaf17df4-5381-4dd9-a947-3adca665219d",
+    "name": "Dentia Chat MVP - Newman v2",
+    "description": "Pruebas automatizadas Postman/Newman para chat-service MVP de Dentia. Incluye pruebas de seguridad sin credenciales de dentista y flujo completo con credenciales de dentista.\n\nv2: slots de citas aleatorios para evitar colisiones por ejecuciones repetidas de Newman.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Chat Security MVP - runnable without dentist credentials",
+      "description": "Pruebas que deben correr con el entorno local actual sin contraseña de dentista. Valida health, JWT, relación paciente-dentista y bloqueos de acceso.",
+      "item": [
+        {
+          "name": "Health - chat-service",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{chatServiceUrl}}/health",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('chat-service health responde 200', function () { pm.response.to.have.status(200); });",
+                  "const json = pm.response.json();",
+                  "pm.test('servicio correcto', function () { pm.expect(json.service).to.eql('chat-service'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Gateway blocks chat without JWT",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/chat/conversations",
+            "description": "Valida que el API Gateway proteja /chat/* con JWT."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('sin JWT debe responder 401', function () { pm.response.to.have.status(401); });",
+                  "const json = pm.response.json();",
+                  "pm.test('mensaje Token requerido', function () { pm.expect(json.message).to.eql('Token requerido'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Register patient for chat security tests",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/register",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Paciente Chat Newman\",\n  \"email\": \"{{patientEmail}}\",\n  \"password\": \"{{patientPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const suffix = Date.now();",
+                  "pm.environment.set('patientEmail', `paciente.chat.${suffix}@dentia.com`);",
+                  "pm.environment.set('patientPassword', 'Password123!');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('registro paciente 200/201', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
+                  "const json = pm.response.json();",
+                  "pm.test('rol PATIENT', function () { pm.expect(json.role).to.eql('PATIENT'); });",
+                  "pm.test('domainId paciente existe', function () { pm.expect(json.domainId).to.be.a('string').and.not.empty; });",
+                  "pm.environment.set('patientId', json.domainId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login patient",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/login",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{patientEmail}}\",\n  \"password\": \"{{patientPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('login paciente 200/201', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
+                  "const json = pm.response.json();",
+                  "pm.test('accessToken existe', function () { pm.expect(json.accessToken).to.be.a('string').and.not.empty; });",
+                  "pm.test('user.domainId coincide', function () { pm.expect(json.user.domainId).to.eql(pm.environment.get('patientId')); });",
+                  "pm.environment.set('patientToken', json.accessToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List patient conversations",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{patientToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/chat/conversations",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('lista conversaciones 200', function () { pm.response.to.have.status(200); });",
+                  "const json = pm.response.json();",
+                  "pm.test('respuesta es arreglo', function () { pm.expect(json).to.be.an('array'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List dentists and store dentistId",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/dentists",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('dentists responde 200', function () { pm.response.to.have.status(200); });",
+                  "const json = pm.response.json();",
+                  "pm.test('existe al menos un dentista seed', function () { pm.expect(json).to.be.an('array').and.not.empty; });",
+                  "pm.test('dentista tiene domainId', function () { pm.expect(json[0].domainId).to.be.a('string').and.not.empty; });",
+                  "pm.environment.set('dentistId', json[0].domainId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create PENDING appointment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{patientToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/appointments",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"patientId\": \"{{patientId}}\",\n  \"dentistId\": \"{{dentistId}}\",\n  \"startAt\": \"{{appointmentStartAt}}\",\n  \"endAt\": \"{{appointmentEndAt}}\",\n  \"reason\": \"Prueba Newman chat\",\n  \"notes\": \"Cita PENDING para probar bloqueo de chat sin relaci\\u00f3n confirmada\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Genera un slot futuro casi imposible de repetir entre ejecuciones de Newman.",
+                  "const dayOffset = 30 + Math.floor(Math.random() * 300);",
+                  "const start = new Date(Date.now() + dayOffset * 24 * 60 * 60 * 1000);",
+                  "start.setUTCHours(16, 0, 0, 0);",
+                  "const end = new Date(start.getTime() + 60 * 60 * 1000);",
+                  "pm.environment.set('appointmentStartAt', start.toISOString());",
+                  "pm.environment.set('appointmentEndAt', end.toISOString());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('crear cita 200/201', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
+                  "const json = pm.response.json();",
+                  "pm.test('cita inicia PENDING', function () { pm.expect(json.status).to.eql('PENDING'); });",
+                  "pm.environment.set('appointmentId', json.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Internal relation is false before confirmation",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-internal-api-key",
+                "value": "{{internalApiKey}}"
+              }
+            ],
+            "url": "{{appointmentsServiceUrl}}/internal/relationships/patient-dentist?patientId={{patientId}}&dentistId={{dentistId}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('endpoint interno responde 200', function () { pm.response.to.have.status(200); });",
+                  "const json = pm.response.json();",
+                  "pm.test('relación no permitida antes de CONFIRMED/COMPLETED', function () { pm.expect(json.allowed).to.eql(false); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Block conversation without valid relation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{patientToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/chat/conversations",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"patientId\": \"{{patientId}}\",\n  \"dentistId\": \"{{dentistId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('sin cita confirmada debe responder 403', function () { pm.response.to.have.status(403); });",
+                  "const json = pm.response.json();",
+                  "pm.test('mensaje de relación inválida', function () { pm.expect(JSON.stringify(json)).to.include('valid relation'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Patient cannot confirm appointment",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{patientToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/appointments/{{appointmentId}}/confirm",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('paciente no puede confirmar cita', function () { pm.response.to.have.status(403); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Chat Full Flow - requires dentist credentials",
+      "description": "Flujo completo: paciente crea cita, dentista confirma, se crea conversación, se manda mensaje, se lista y se marca leído. Requiere dentistEmail y dentistPassword en environment o --env-var.",
+      "item": [
+        {
+          "name": "Full - Register patient",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/register",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Paciente Chat Full Newman\",\n  \"email\": \"{{fullPatientEmail}}\",\n  \"password\": \"{{fullPatientPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const suffix = Date.now();",
+                  "pm.environment.set('fullPatientEmail', `paciente.fullchat.${suffix}@dentia.com`);",
+                  "pm.environment.set('fullPatientPassword', 'Password123!');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('registro paciente full 200/201', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
+                  "const json = pm.response.json();",
+                  "pm.test('domainId paciente full existe', function () { pm.expect(json.domainId).to.be.a('string').and.not.empty; });",
+                  "pm.environment.set('fullPatientId', json.domainId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Full - Login patient",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/login",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{fullPatientEmail}}\",\n  \"password\": \"{{fullPatientPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('login paciente full 200/201', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
+                  "const json = pm.response.json();",
+                  "pm.environment.set('fullPatientToken', json.accessToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Full - Store dentistId",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/dentists",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('dentists responde 200', function () { pm.response.to.have.status(200); });",
+                  "const json = pm.response.json();",
+                  "pm.test('existe dentista', function () { pm.expect(json).to.be.an('array').and.not.empty; });",
+                  "const envDentistId = pm.environment.get('dentistId');",
+                  "pm.environment.set('fullDentistId', envDentistId || json[0].domainId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Full - Create appointment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{fullPatientToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/appointments",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"patientId\": \"{{fullPatientId}}\",\n  \"dentistId\": \"{{fullDentistId}}\",\n  \"startAt\": \"{{fullAppointmentStartAt}}\",\n  \"endAt\": \"{{fullAppointmentEndAt}}\",\n  \"reason\": \"Prueba Newman chat full\",\n  \"notes\": \"Cita para probar flujo completo de chat\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Genera un slot futuro casi imposible de repetir entre ejecuciones de Newman.",
+                  "const dayOffset = 400 + Math.floor(Math.random() * 300);",
+                  "const start = new Date(Date.now() + dayOffset * 24 * 60 * 60 * 1000);",
+                  "start.setUTCHours(18, 0, 0, 0);",
+                  "const end = new Date(start.getTime() + 60 * 60 * 1000);",
+                  "pm.environment.set('fullAppointmentStartAt', start.toISOString());",
+                  "pm.environment.set('fullAppointmentEndAt', end.toISOString());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('crear cita full 200/201', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
+                  "const json = pm.response.json();",
+                  "pm.environment.set('fullAppointmentId', json.id);",
+                  "pm.test('cita full PENDING', function () { pm.expect(json.status).to.eql('PENDING'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Full - Login dentist",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/login",
+            "description": "Requiere dentistEmail y dentistPassword. Si no existen, este folder debe fallar: es un pendiente real del proyecto.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{dentistEmail}}\",\n  \"password\": \"{{dentistPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('dentistEmail configurado', function () { pm.expect(pm.environment.get('dentistEmail'), 'Set dentistEmail').to.be.a('string').and.not.empty; });",
+                  "pm.test('dentistPassword configurado', function () { pm.expect(pm.environment.get('dentistPassword'), 'Set dentistPassword').to.be.a('string').and.not.empty; });",
+                  "pm.test('login dentista 200/201', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
+                  "const json = pm.response.json();",
+                  "pm.test('rol DENTIST o ADMIN', function () { pm.expect(['DENTIST', 'ADMIN']).to.include(json.user.role); });",
+                  "pm.environment.set('dentistToken', json.accessToken);",
+                  "if (json.user.domainId) { pm.environment.set('fullDentistId', json.user.domainId); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Full - Confirm appointment as dentist",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{dentistToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/appointments/{{fullAppointmentId}}/confirm",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('dentista confirma cita 200/201', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
+                  "const json = pm.response.json();",
+                  "pm.test('cita CONFIRMED', function () { pm.expect(json.status).to.eql('CONFIRMED'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Full - Internal relation is true",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-internal-api-key",
+                "value": "{{internalApiKey}}"
+              }
+            ],
+            "url": "{{appointmentsServiceUrl}}/internal/relationships/patient-dentist?patientId={{fullPatientId}}&dentistId={{fullDentistId}}",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('relación interna responde 200', function () { pm.response.to.have.status(200); });",
+                  "const json = pm.response.json();",
+                  "pm.test('relación permitida tras confirmar', function () { pm.expect(json.allowed).to.eql(true); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Full - Create chat conversation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{fullPatientToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/chat/conversations",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"patientId\": \"{{fullPatientId}}\",\n  \"dentistId\": \"{{fullDentistId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('crear conversación 200/201', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
+                  "const json = pm.response.json();",
+                  "pm.test('conversationId existe', function () { pm.expect(json._id).to.be.a('string').and.not.empty; });",
+                  "pm.environment.set('conversationId', json._id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Full - Send patient message",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{fullPatientToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/chat/conversations/{{conversationId}}/messages",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"body\": \"Hola doctor, este mensaje viene desde Newman.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('enviar mensaje 200/201', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
+                  "const json = pm.response.json();",
+                  "pm.test('mensaje del paciente', function () { pm.expect(json.senderRole).to.eql('PATIENT'); });",
+                  "pm.test('body correcto', function () { pm.expect(json.body).to.include('Newman'); });",
+                  "pm.environment.set('messageId', json._id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Full - List messages",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{fullPatientToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/chat/conversations/{{conversationId}}/messages",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('listar mensajes 200', function () { pm.response.to.have.status(200); });",
+                  "const json = pm.response.json();",
+                  "pm.test('existe al menos un mensaje', function () { pm.expect(json).to.be.an('array').and.not.empty; });",
+                  "pm.test('mensaje creado está presente', function () { pm.expect(json.some(m => m._id === pm.environment.get('messageId'))).to.eql(true); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Full - Mark conversation as read",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{fullPatientToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/chat/conversations/{{conversationId}}/read",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('marcar leído 200', function () { pm.response.to.have.status(200); });",
+                  "const json = pm.response.json();",
+                  "pm.test('ok true', function () { pm.expect(json.ok).to.eql(true); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Full - List conversations with preview/read state",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{fullPatientToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/chat/conversations",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('listar conversaciones 200', function () { pm.response.to.have.status(200); });",
+                  "const json = pm.response.json();",
+                  "const conversation = json.find(c => c._id === pm.environment.get('conversationId'));",
+                  "pm.test('conversación existe', function () { pm.expect(conversation).to.exist; });",
+                  "pm.test('lastMessagePreview actualizado', function () { pm.expect(conversation.lastMessagePreview).to.include('Newman'); });",
+                  "pm.test('lastReadAt actualizado para paciente', function () { pm.expect(conversation.lastReadAt[pm.environment.get('fullPatientId')]).to.exist; });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
