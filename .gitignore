@@ -8,3 +8,10 @@ coverage/
 __pycache__/
 .pytest_cache/
 *.pyc
+# TypeScript incremental build
+*.tsbuildinfo
+
+# Local test artifacts
+test-file.txt
+TAR03_Oro.pdf
+downloaded-*.pdf

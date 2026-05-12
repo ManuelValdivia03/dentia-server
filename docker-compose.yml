@@ -111,6 +111,15 @@ services:
       - "27018:27017"
     volumes:
       - chat_mongo_data:/data/db
+    
+  files-mongo:
+    image: mongo:7
+    container_name: dentia-files-mongo
+    restart: unless-stopped
+    ports:
+      - "27019:27017"
+    volumes:
+      - files_mongo_data:/data/db
 
   chat-service:
     build:
@@ -128,6 +137,25 @@ services:
       INTERNAL_API_KEY: dev-internal-key
     ports:
       - "3004:3004"
+    
+  files-service:
+    build:
+      context: ./files-service
+      dockerfile: Dockerfile
+    container_name: dentia-files-service
+    restart: unless-stopped
+    depends_on:
+      - files-mongo
+    environment:
+      PORT: 3005
+      MONGODB_URI: mongodb://files-mongo:27017/dentia_files
+      FILES_UPLOAD_DIR: /app/uploads
+      MAX_FILE_SIZE_MB: 10
+      INTERNAL_API_KEY: dev-internal-key
+    volumes:
+      - files_uploads:/app/uploads
+    ports:
+      - "3005:3005"
 
   api-gateway:
     build:
@@ -143,15 +171,20 @@ services:
       PRESCRIPTIONS_TCP_HOST: prescriptions-service
       PRESCRIPTIONS_TCP_PORT: ${PRESCRIPTIONS_TCP_PORT}
       CHAT_SERVICE_URL: http://chat-service:3004
+      FILES_SERVICE_URL: http://files-service:3005
+      INTERNAL_API_KEY: dev-internal-key
       JWT_SECRET: ${JWT_SECRET}
     depends_on:
       - auth-service
       - appointments-service
       - prescriptions-service
       - chat-service
+      - files-service
     ports:
       - "${API_GATEWAY_PORT}:3000"
 
 volumes:
   postgres_data:
   chat_mongo_data:
+  files_mongo_data:
+  files_uploads:
