@@ -71,6 +71,7 @@ services:
       DB_NAME: ${POSTGRES_APPOINTMENTS_DB}
       RABBITMQ_URL: ${RABBITMQ_URL}
       RABBITMQ_QUEUE_APPOINTMENTS: ${RABBITMQ_QUEUE_APPOINTMENTS}
+      INTERNAL_API_KEY: dev-internal-key
     depends_on:
       postgres:
         condition: service_healthy
@@ -102,6 +103,32 @@ services:
       - "${PRESCRIPTIONS_SERVICE_PORT}:3003"
       - "${PRESCRIPTIONS_TCP_PORT}:${PRESCRIPTIONS_TCP_PORT}"
 
+  chat-mongo:
+    image: mongo:7
+    container_name: dentia-chat-mongo
+    restart: unless-stopped
+    ports:
+      - "27018:27017"
+    volumes:
+      - chat_mongo_data:/data/db
+
+  chat-service:
+    build:
+      context: ./chat-service
+      dockerfile: Dockerfile
+    container_name: dentia-chat-service
+    restart: unless-stopped
+    depends_on:
+      - chat-mongo
+      - appointments-service
+    environment:
+      PORT: 3004
+      MONGODB_URI: mongodb://chat-mongo:27017/dentia_chat
+      APPOINTMENTS_SERVICE_URL: http://appointments-service:3002
+      INTERNAL_API_KEY: dev-internal-key
+    ports:
+      - "3004:3004"
+
   api-gateway:
     build:
       context: ./api-gateway
@@ -115,13 +142,16 @@ services:
       APPOINTMENTS_TCP_PORT: ${APPOINTMENTS_TCP_PORT}
       PRESCRIPTIONS_TCP_HOST: prescriptions-service
       PRESCRIPTIONS_TCP_PORT: ${PRESCRIPTIONS_TCP_PORT}
+      CHAT_SERVICE_URL: http://chat-service:3004
       JWT_SECRET: ${JWT_SECRET}
     depends_on:
       - auth-service
       - appointments-service
       - prescriptions-service
+      - chat-service
     ports:
       - "${API_GATEWAY_PORT}:3000"
 
 volumes:
   postgres_data:
+  chat_mongo_data:

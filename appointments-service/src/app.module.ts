@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { HealthController } from './health.controller';
+import { InternalModule } from './internal/internal.module';
 import { AppointmentsModule } from './appointments/appointments.module';
 import { Appointment } from './appointments/entities/appointment.entity';
 
@@ -17,6 +18,7 @@ import { Appointment } from './appointments/entities/appointment.entity';
       synchronize: true,
     }),
     AppointmentsModule,
+    InternalModule,
   ],
   controllers: [HealthController],
 })
