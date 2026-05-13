@@ -1,10 +1,13 @@
 import { ValidationPipe } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
+  const config = app.get(ConfigService);
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -18,14 +21,20 @@ async function bootstrap() {
     {
       transport: Transport.TCP,
       options: {
-        host: process.env.APPOINTMENTS_TCP_HOST ?? '0.0.0.0',
-        port: Number(process.env.APPOINTMENTS_TCP_PORT ?? 4001),
+        host: config.get<string>('APPOINTMENTS_TCP_HOST', '0.0.0.0'),
+        port: config.get<number>('APPOINTMENTS_TCP_PORT', 4001),
       },
     },
     { inheritAppConfig: true },
   );
 
   await app.startAllMicroservices();
-  await app.listen(Number(process.env.PORT ?? 3002));
+
+  const port = config.get<number>('PORT', 3002);
+  await app.listen(port);
 }
-bootstrap();
+
+bootstrap().catch((error) => {
+  console.error('appointments-service bootstrap failed:', error);
+  process.exit(1);
+});
