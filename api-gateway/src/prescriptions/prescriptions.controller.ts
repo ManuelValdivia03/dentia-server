@@ -7,6 +7,18 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiCreatedResponse,
+  ApiForbiddenResponse,
+  ApiNotFoundResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiParam,
+  ApiServiceUnavailableResponse,
+  ApiTags,
+  ApiUnauthorizedResponse,
+} from '@nestjs/swagger';
 import { Request } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -20,6 +32,8 @@ type AuthenticatedRequest = Request & {
   user: RequestUser;
 };
 
+@ApiTags('Prescriptions')
+@ApiBearerAuth('JWT')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller()
 export class PrescriptionsController {
@@ -27,6 +41,11 @@ export class PrescriptionsController {
 
   @Post('prescriptions')
   @Roles(UserRole.ADMIN, UserRole.DENTIST)
+  @ApiOperation({ summary: 'Crear receta asociada a una cita' })
+  @ApiCreatedResponse({ description: 'Receta creada correctamente.' })
+  @ApiForbiddenResponse({ description: 'Solo administrador o dentista pueden crear recetas.' })
+  @ApiUnauthorizedResponse({ description: 'JWT ausente o inválido.' })
+  @ApiServiceUnavailableResponse({ description: 'prescriptions-service no disponible.' })
   create(
     @Body() dto: CreatePrescriptionDto,
     @Req() req: AuthenticatedRequest,
