@@ -1,0 +1,47 @@
+{
+  "name": "dentia-server",
+  "version": "1.0.0",
+  "description": "Backend inicial de **Dentia**, con arquitectura basada en servicios para autenticación y gestión de citas odontológicas.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "dependencies": {
+    "consola": "^3.4.2",
+    "debug": "^4.4.3",
+    "fast-safe-stringify": "^2.1.1",
+    "file-type": "^21.3.4",
+    "ieee754": "^1.2.1",
+    "iterare": "^1.2.1",
+    "load-esm": "^1.0.3",
+    "ms": "^2.1.3",
+    "path-to-regexp": "^8.4.2",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2",
+    "strtok3": "^10.3.5",
+    "token-types": "^6.1.2",
+    "tslib": "^2.8.1",
+    "uid": "^2.0.2",
+    "uint8array-extras": "^1.5.0"
+  },
+  "devDependencies": {
+    "newman": "^6.2.2",
+    "newman-reporter-htmlextra": "^1.23.1"
+  },
+  "scripts": {
+    "test:newman:chat": "newman run postman/collections/Dentia_Chat_MVP_Newman.postman_collection.json -e postman/environments/Dentia_Local.postman_environment.json",
+    "test:newman:chat:html": "newman run postman/collections/Dentia_Chat_MVP_Newman.postman_collection.json -e postman/environments/Dentia_Local.postman_environment.json --reporters cli,htmlextra --reporter-htmlextra-export postman/reports/chat-report.html"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ManuelValdivia03/dentia-server.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/ManuelValdivia03/dentia-server/issues"
+  },
+  "homepage": "https://github.com/ManuelValdivia03/dentia-server#readme"
+}
