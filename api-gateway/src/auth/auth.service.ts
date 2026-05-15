@@ -4,6 +4,8 @@ import { AxiosError, AxiosResponse } from 'axios';
 import { firstValueFrom, Observable } from 'rxjs';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { VerifyEmailDto } from './dto/verify-email.dto';
+import { ResendVerificationCodeDto } from './dto/resend-verification-code.dto';
 
 @Injectable()
 export class AuthService {
@@ -14,7 +16,25 @@ export class AuthService {
 
   register(dto: RegisterDto) {
     return this.forwardRequest(() =>
-    this.httpService.post(`${this.authServiceBaseUrl}/auth/register`, dto),
+      this.httpService.post(`${this.authServiceBaseUrl}/auth/register`, dto),
+    );
+  }
+
+  verifyEmail(dto: VerifyEmailDto) {
+    return this.forwardRequest(() =>
+      this.httpService.post(
+        `${this.authServiceBaseUrl}/auth/verify-email`,
+        dto,
+      ),
+    );
+  }
+
+  resendVerificationCode(dto: ResendVerificationCodeDto) {
+    return this.forwardRequest(() =>
+      this.httpService.post(
+        `${this.authServiceBaseUrl}/auth/resend-verification-code`,
+        dto,
+      ),
     );
   }
 

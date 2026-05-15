@@ -7,6 +7,7 @@ import { User } from '../users/entities/user.entity';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { UsersController } from '../users/users.controller';
 import { DentistsController } from '../users/dentists.controller';
+import { MailService } from '../mail/mail.service';
 
 @Module({
   imports: [
@@ -17,6 +18,6 @@ import { DentistsController } from '../users/dentists.controller';
     }),
   ],
   controllers: [AuthController, UsersController, DentistsController],
-  providers: [AuthService, JwtAuthGuard],
+  providers: [AuthService, JwtAuthGuard, MailService],
 })
 export class AuthModule {}
