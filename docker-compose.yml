@@ -204,6 +204,7 @@ services:
       PRESCRIPTIONS_TCP_PORT: ${PRESCRIPTIONS_TCP_PORT}
       CHAT_SERVICE_URL: http://chat-service:3004
       FILES_SERVICE_URL: http://files-service:3005
+      REPORTS_SERVICE_URL: http://reports-service:3006
       INTERNAL_API_KEY: dev-internal-key
       JWT_SECRET: ${JWT_SECRET}
     depends_on:
@@ -212,8 +213,11 @@ services:
       - prescriptions-service
       - chat-service
       - files-service
+      - reports-service
     ports:
       - "${API_GATEWAY_PORT}:3000"
+    networks:
+      - dentia-network
 
 volumes:
   postgres_data:
