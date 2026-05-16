@@ -1,4 +1,4 @@
-import { IsEmail, IsString, MinLength } from 'class-validator';
+import { IsEmail, IsIn, IsOptional, IsString, MinLength } from 'class-validator';
 
 export class RegisterDto {
   @IsEmail()
@@ -11,4 +11,10 @@ export class RegisterDto {
   @IsString()
   @MinLength(3)
   fullName!: string;
+
+  @IsOptional()
+  @IsIn(['PATIENT', 'DENTIST'], {
+    message: 'El rol de registro solo puede ser PATIENT o DENTIST',
+  })
+  role?: 'PATIENT' | 'DENTIST';
 }

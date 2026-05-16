@@ -105,16 +105,21 @@ export class AuthService implements OnModuleInit {
       throw new ConflictException('Ya existe un usuario con ese correo');
     }
 
+    const role =
+      dto.role === UserRole.DENTIST ? UserRole.DENTIST : UserRole.PATIENT;
+
+    const domainPrefix = role === UserRole.DENTIST ? 'd' : 'p';
+
     const passwordHash = await bcrypt.hash(dto.password, 10);
     const verificationCode = this.generateVerificationCode();
     const verificationCodeHash = await bcrypt.hash(verificationCode, 10);
     const expiresAt = this.getVerificationExpirationDate();
 
-    const patient = this.usersRepository.create({
+    const user = this.usersRepository.create({
       email: dto.email,
       passwordHash,
-      role: UserRole.PATIENT,
-      domainId: `p-${randomUUID()}`,
+      role,
+      domainId: `${domainPrefix}-${randomUUID()}`,
       fullName: dto.fullName,
       isActive: true,
       emailVerified: false,
@@ -124,17 +129,17 @@ export class AuthService implements OnModuleInit {
       emailVerificationLastSentAt: new Date(),
     });
 
-    const savedPatient = await this.usersRepository.save(patient);
+    const savedUser = await this.usersRepository.save(user);
 
     await this.mailService.sendVerificationCode(
-      savedPatient.email,
+      savedUser.email,
       verificationCode,
     );
 
     return {
       message:
         'Registro iniciado. Revisa tu correo para verificar tu cuenta.',
-      user: this.toSafeUser(savedPatient),
+      user: this.toSafeUser(savedUser),
     };
   }
 

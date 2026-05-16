@@ -192,6 +192,62 @@ describe('AuthService', () => {
     });
   });
 
+    it('registerPatient debe crear dentista no verificado si role es DENTIST', async () => {
+    const dto = {
+      email: 'dentista@dentia.local',
+      password: 'Password123*',
+      fullName: 'Dra. Nueva',
+      role: 'DENTIST' as const,
+    };
+
+    usersRepository.findOne.mockResolvedValueOnce(null);
+
+    (bcrypt.hash as jest.Mock).mockImplementation(
+      async (value: string) => `hash-${value}`,
+    );
+
+    usersRepository.create.mockImplementation((data: any) => ({
+      id: 'd-user-1',
+      ...data,
+    }));
+
+    usersRepository.save.mockImplementation(async (user: any) => user);
+
+    const result = await service.registerPatient(dto);
+
+    expect(usersRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        email: dto.email,
+        passwordHash: 'hash-Password123*',
+        role: UserRole.DENTIST,
+        domainId: expect.stringMatching(/^d-/),
+        fullName: dto.fullName,
+        isActive: true,
+        emailVerified: false,
+        emailVerificationCodeHash: expect.any(String),
+        emailVerificationExpiresAt: expect.any(Date),
+        emailVerificationAttempts: 0,
+        emailVerificationLastSentAt: expect.any(Date),
+      }),
+    );
+
+    expect(mailService.sendVerificationCode).toHaveBeenCalledWith(
+      dto.email,
+      expect.stringMatching(/^\d{6}$/),
+    );
+
+    expect(result).toEqual({
+      message: 'Registro iniciado. Revisa tu correo para verificar tu cuenta.',
+      user: expect.objectContaining({
+        id: 'd-user-1',
+        email: dto.email,
+        role: UserRole.DENTIST,
+        fullName: dto.fullName,
+        emailVerified: false,
+      }),
+    });
+  });
+
   it('login debe regresar token y usuario si las credenciales son válidas y el correo está verificado', async () => {
     const dto = {
       email: 'patient1@dentia.local',
