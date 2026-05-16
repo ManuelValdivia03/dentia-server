@@ -44,7 +44,9 @@ export class MailService {
           </div>
         `,
       });
-    } catch {
+      } catch (error) {
+      console.error('SMTP SEND ERROR:', error);
+
       throw new ServiceUnavailableException(
         'No se pudo enviar el correo de verificación',
       );
