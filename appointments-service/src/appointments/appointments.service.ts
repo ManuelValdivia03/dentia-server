@@ -12,6 +12,7 @@ import { CreateAppointmentDto } from './dto/create-appointment.dto';
 import { RescheduleAppointmentDto } from './dto/reschedule-appointment.dto';
 import { EventsPublisher } from '../events/events.publisher';
 import { RequestUser, RequestUserRole } from './interfaces/request-user.interface';
+import { ReportsClientService } from '../reports/reports-client.service';
 
 @Injectable()
 export class AppointmentsService {
@@ -19,6 +20,7 @@ export class AppointmentsService {
     @InjectRepository(Appointment)
     private readonly appointmentsRepository: Repository<Appointment>,
     private readonly eventsPublisher: EventsPublisher,
+    private readonly reportsClient: ReportsClientService,
   ) {}
 
   async findAll(requester: RequestUser) {
@@ -137,6 +139,8 @@ export class AppointmentsService {
       status: savedAppointment.status,
     });
 
+    await this.syncAppointmentToReports(savedAppointment);
+
     return savedAppointment;
   }
 
@@ -163,14 +167,22 @@ export class AppointmentsService {
     appointment.endAt = endAt;
     appointment.status = AppointmentStatus.PENDING;
 
-    return this.appointmentsRepository.save(appointment);
+    const savedAppointment = await this.appointmentsRepository.save(appointment);
+
+    await this.syncAppointmentToReports(savedAppointment);
+
+    return savedAppointment;
   }
 
   async cancel(id: string, requester: RequestUser) {
     const appointment = await this.findByIdOrFail(id);
     this.ensureCanCancelAppointment(appointment, requester);
     appointment.status = AppointmentStatus.CANCELLED;
-    return this.appointmentsRepository.save(appointment);
+    const savedAppointment = await this.appointmentsRepository.save(appointment);
+
+    await this.syncAppointmentToReports(savedAppointment);
+
+    return savedAppointment
   }
 
   async confirm(id: string, requester: RequestUser) {
@@ -182,7 +194,11 @@ export class AppointmentsService {
     }
 
     appointment.status = AppointmentStatus.CONFIRMED;
-    return this.appointmentsRepository.save(appointment);
+    const savedAppointment = await this.appointmentsRepository.save(appointment);
+
+    await this.syncAppointmentToReports(savedAppointment);
+
+    return savedAppointment;
   }
 
   async complete(id: string, requester: RequestUser) {
@@ -194,7 +210,11 @@ export class AppointmentsService {
     }
 
     appointment.status = AppointmentStatus.COMPLETED;
-    return this.appointmentsRepository.save(appointment);
+    const savedAppointment = await this.appointmentsRepository.save(appointment);
+
+    await this.syncAppointmentToReports(savedAppointment);
+
+    return savedAppointment;
   }
 
   private async findByIdOrFail(id: string) {
@@ -326,5 +346,45 @@ export class AppointmentsService {
     }
 
     throw new ForbiddenException('No tienes permisos para operar esta cita');
+  }
+
+  private async syncAppointmentToReports(appointment: Appointment): Promise<void> {
+    await this.reportsClient.sendAppointmentSnapshot({
+      appointment_id: appointment.id,
+      doctor_id: appointment.dentistId,
+      patient_id: appointment.patientId,
+      status: this.mapStatusToReportStatus(appointment.status),
+      scheduled_at: appointment.startAt.toISOString(),
+      duration_minutes: this.calculateDurationMinutes(
+        appointment.startAt,
+        appointment.endAt,
+      ),
+    });
+  }
+
+  private mapStatusToReportStatus(status: AppointmentStatus): string {
+    switch (status) {
+      case AppointmentStatus.PENDING:
+        return 'scheduled';
+
+      case AppointmentStatus.CONFIRMED:
+        return 'confirmed';
+
+      case AppointmentStatus.COMPLETED:
+        return 'completed';
+
+      case AppointmentStatus.CANCELLED:
+        return 'cancelled';
+
+      default:
+        return 'scheduled';
+    }
+  }
+
+  private calculateDurationMinutes(startAt: Date, endAt: Date): number {
+    const durationMs = endAt.getTime() - startAt.getTime();
+    const durationMinutes = Math.round(durationMs / 60000);
+
+    return durationMinutes > 0 ? durationMinutes : 60;
   }
 }
