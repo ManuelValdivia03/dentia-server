@@ -1,11 +1,10 @@
 from fastapi import APIRouter, Depends, Query, status
-
 from app.schemas.reports import (
     AppointmentSnapshotRequest,
     DashboardSummaryResponse,
     AppointmentStatusReportResponse,
 )
-from app.security.auth import require_roles, require_internal_key
+from app.security.auth import require_roles, require_internal_key, resolve_doctor_scope
 from app.services.reports_service import ReportsService
 
 router = APIRouter(prefix="/reports", tags=["Reports"])
@@ -40,9 +39,11 @@ def create_appointment_snapshot(
 )
 def get_dashboard_summary(
     doctor_id: str | None = Query(default=None, description="Filtra por dentista"),
-    _: dict = Depends(require_roles("admin", "dentist")),
+    current_user: dict = Depends(require_roles("admin", "dentist")),
 ):
-    return service.get_dashboard_summary(doctor_id)
+    effective_doctor_id = resolve_doctor_scope(current_user, doctor_id)
+
+    return service.get_dashboard_summary(effective_doctor_id)
 
 
 @router.get(
@@ -55,6 +56,8 @@ def get_dashboard_summary(
 )
 def get_appointments_by_status(
     doctor_id: str | None = Query(default=None, description="Filtra por dentista"),
-    _: dict = Depends(require_roles("admin", "dentist")),
+    current_user: dict = Depends(require_roles("admin", "dentist")),
 ):
-    return service.get_appointments_by_status(doctor_id)
+    effective_doctor_id = resolve_doctor_scope(current_user, doctor_id)
+
+    return service.get_appointments_by_status(effective_doctor_id)
