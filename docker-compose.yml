@@ -17,6 +17,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - dentia-network
 
   rabbitmq:
     image: rabbitmq:4-management
@@ -33,6 +35,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - dentia-network
 
   auth-service:
     build:
@@ -61,6 +65,8 @@ services:
         condition: service_healthy
     ports:
       - "${AUTH_SERVICE_PORT}:3001"
+    networks:
+      - dentia-network
 
   appointments-service:
     build:
@@ -80,14 +86,19 @@ services:
       RABBITMQ_URL: ${RABBITMQ_URL}
       RABBITMQ_QUEUE_APPOINTMENTS: ${RABBITMQ_QUEUE_APPOINTMENTS}
       INTERNAL_API_KEY: dev-internal-key
+      REPORTS_SERVICE_URL: http://reports-service:3006
     depends_on:
       postgres:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+      reports-service:
+        condition: service_started
     ports:
       - "${APPOINTMENTS_HTTP_PORT}:3002"
       - "${APPOINTMENTS_TCP_PORT}:${APPOINTMENTS_TCP_PORT}"
+    networks:
+      - dentia-network
 
   prescriptions-service:
     build:
@@ -110,6 +121,8 @@ services:
     ports:
       - "${PRESCRIPTIONS_SERVICE_PORT}:3003"
       - "${PRESCRIPTIONS_TCP_PORT}:${PRESCRIPTIONS_TCP_PORT}"
+    networks:
+      - dentia-network
 
   chat-mongo:
     image: mongo:7
@@ -145,6 +158,38 @@ services:
       INTERNAL_API_KEY: dev-internal-key
     ports:
       - "3004:3004"
+
+  neo4j:
+    image: neo4j:5
+    container_name: dentia-neo4j
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    environment:
+      NEO4J_AUTH: neo4j/dentia_reports_password
+    volumes:
+      - neo4j_data:/data
+    networks:
+      - dentia-network
+
+  reports-service:
+    build:
+      context: ./reports-service
+      dockerfile: Dockerfile
+    container_name: dentia-reports-service
+    ports:
+      - "3006:3006"
+    environment:
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USER: neo4j
+      NEO4J_PASSWORD: dentia_reports_password
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_ALGORITHM: HS256
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY}
+    depends_on:
+      - neo4j
+    networks:
+      - dentia-network
     
   files-service:
     build:
@@ -180,6 +225,7 @@ services:
       PRESCRIPTIONS_TCP_PORT: ${PRESCRIPTIONS_TCP_PORT}
       CHAT_SERVICE_URL: http://chat-service:3004
       FILES_SERVICE_URL: http://files-service:3005
+      REPORTS_SERVICE_URL: http://reports-service:3006
       INTERNAL_API_KEY: dev-internal-key
       JWT_SECRET: ${JWT_SECRET}
     depends_on:
@@ -188,11 +234,19 @@ services:
       - prescriptions-service
       - chat-service
       - files-service
+      - reports-service
     ports:
       - "${API_GATEWAY_PORT}:3000"
+    networks:
+      - dentia-network
 
 volumes:
   postgres_data:
   chat_mongo_data:
   files_mongo_data:
   files_uploads:
+  neo4j_data:
+
+networks:
+  dentia-network:
+    driver: bridge

@@ -7,14 +7,19 @@ import {
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
+
 import { AppointmentsService } from './appointments.service';
 import { Appointment } from './entities/appointment.entity';
 import { AppointmentStatus } from './enums/appointment-status.enum';
 import { RequestUserRole } from './interfaces/request-user.interface';
+import { EventsPublisher } from '../events/events.publisher';
+import { ReportsClientService } from '../reports/reports-client.service';
 
 describe('AppointmentsService', () => {
   let service: AppointmentsService;
   let repository: any;
+  let eventsPublisher: any;
+  let reportsClient: any;
 
   const adminRequester = {
     sub: 'u-admin',
@@ -45,6 +50,19 @@ describe('AppointmentsService', () => {
     getOne: jest.fn(),
   });
 
+  const makeAppointment = (overrides: Partial<Appointment> = {}) =>
+    ({
+      id: 'a1',
+      patientId: 'p1',
+      dentistId: 'd1',
+      startAt: new Date('2026-04-22T10:00:00.000Z'),
+      endAt: new Date('2026-04-22T11:00:00.000Z'),
+      status: AppointmentStatus.PENDING,
+      reason: 'Limpieza',
+      notes: 'N/A',
+      ...overrides,
+    }) as Appointment;
+
   beforeEach(async () => {
     repository = {
       find: jest.fn(),
@@ -54,6 +72,14 @@ describe('AppointmentsService', () => {
       createQueryBuilder: jest.fn(),
     };
 
+    eventsPublisher = {
+      publishAppointmentCreated: jest.fn().mockResolvedValue(undefined),
+    };
+
+    reportsClient = {
+      sendAppointmentSnapshot: jest.fn().mockResolvedValue(undefined),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AppointmentsService,
@@ -61,10 +87,22 @@ describe('AppointmentsService', () => {
           provide: getRepositoryToken(Appointment),
           useValue: repository,
         },
+        {
+          provide: EventsPublisher,
+          useValue: eventsPublisher,
+        },
+        {
+          provide: ReportsClientService,
+          useValue: reportsClient,
+        },
       ],
     }).compile();
 
     service = module.get<AppointmentsService>(AppointmentsService);
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
   });
 
   it('findAll debe regresar citas ordenadas por startAt ASC para admin', async () => {
@@ -93,7 +131,7 @@ describe('AppointmentsService', () => {
   });
 
   it('findOne debe regresar una cita si existe y pertenece al paciente', async () => {
-    const appointment = { id: 'a1', patientId: 'p1', dentistId: 'd1' };
+    const appointment = makeAppointment();
     repository.findOne.mockResolvedValueOnce(appointment);
 
     const result = await service.findOne('a1', patientRequester as any);
@@ -112,15 +150,17 @@ describe('AppointmentsService', () => {
 
   it('getAvailability debe marcar ocupado el slot empalmado', async () => {
     const qb = makeQb();
+
     qb.getMany.mockResolvedValueOnce([
-      {
+      makeAppointment({
         id: 'a1',
         dentistId: 'd1',
         startAt: new Date('2026-04-21T10:00:00.000Z'),
         endAt: new Date('2026-04-21T11:00:00.000Z'),
         status: AppointmentStatus.CONFIRMED,
-      },
+      }),
     ]);
+
     repository.createQueryBuilder.mockReturnValueOnce(qb);
 
     const result = await service.getAvailability(
@@ -152,6 +192,7 @@ describe('AppointmentsService', () => {
 
     const qb = makeQb();
     qb.getOne.mockResolvedValueOnce(null);
+
     repository.createQueryBuilder.mockReturnValueOnce(qb);
     repository.create.mockImplementation((data: any) => data);
     repository.save.mockImplementation(async (data: any) => ({
@@ -170,6 +211,26 @@ describe('AppointmentsService', () => {
         status: AppointmentStatus.PENDING,
       }),
     );
+
+    expect(eventsPublisher.publishAppointmentCreated).toHaveBeenCalledWith(
+      expect.objectContaining({
+        appointmentId: 'a1',
+        patientId: 'p1',
+        dentistId: 'd1',
+        status: AppointmentStatus.PENDING,
+      }),
+    );
+
+    expect(reportsClient.sendAppointmentSnapshot).toHaveBeenCalledWith(
+      expect.objectContaining({
+        appointment_id: 'a1',
+        patient_id: 'p1',
+        doctor_id: 'd1',
+        status: 'scheduled',
+        duration_minutes: 60,
+      }),
+    );
+
     expect(result).toEqual(
       expect.objectContaining({
         id: 'a1',
@@ -191,6 +252,8 @@ describe('AppointmentsService', () => {
     await expect(
       service.create(dto as any, patientRequester as any),
     ).rejects.toThrow(ForbiddenException);
+
+    expect(reportsClient.sendAppointmentSnapshot).not.toHaveBeenCalled();
   });
 
   it('create debe lanzar error si el rango es inválido', async () => {
@@ -204,6 +267,8 @@ describe('AppointmentsService', () => {
     await expect(
       service.create(dto as any, patientRequester as any),
     ).rejects.toThrow(BadRequestException);
+
+    expect(reportsClient.sendAppointmentSnapshot).not.toHaveBeenCalled();
   });
 
   it('create debe lanzar error si existe empalme', async () => {
@@ -216,20 +281,20 @@ describe('AppointmentsService', () => {
 
     const qb = makeQb();
     qb.getOne.mockResolvedValueOnce({ id: 'a-existing' });
+
     repository.createQueryBuilder.mockReturnValueOnce(qb);
 
     await expect(
       service.create(dto as any, patientRequester as any),
     ).rejects.toThrow(BadRequestException);
+
+    expect(reportsClient.sendAppointmentSnapshot).not.toHaveBeenCalled();
   });
 
   it('reschedule debe actualizar horario y regresar a PENDING', async () => {
-    const appointment = {
-      id: 'a1',
-      patientId: 'p1',
-      dentistId: 'd1',
+    const appointment = makeAppointment({
       status: AppointmentStatus.CONFIRMED,
-    };
+    });
 
     const dto = {
       startAt: '2026-04-22T12:00:00.000Z',
@@ -240,8 +305,8 @@ describe('AppointmentsService', () => {
 
     const qb = makeQb();
     qb.getOne.mockResolvedValueOnce(null);
-    repository.createQueryBuilder.mockReturnValueOnce(qb);
 
+    repository.createQueryBuilder.mockReturnValueOnce(qb);
     repository.save.mockImplementation(async (data: any) => data);
 
     const result = await service.reschedule(
@@ -253,15 +318,22 @@ describe('AppointmentsService', () => {
     expect(result.status).toBe(AppointmentStatus.PENDING);
     expect(result.startAt).toEqual(new Date(dto.startAt));
     expect(result.endAt).toEqual(new Date(dto.endAt));
+
+    expect(reportsClient.sendAppointmentSnapshot).toHaveBeenCalledWith(
+      expect.objectContaining({
+        appointment_id: 'a1',
+        doctor_id: 'd1',
+        patient_id: 'p1',
+        status: 'scheduled',
+        duration_minutes: 60,
+      }),
+    );
   });
 
   it('cancel debe cambiar status a CANCELLED', async () => {
-    const appointment = {
-      id: 'a1',
-      patientId: 'p1',
-      dentistId: 'd1',
+    const appointment = makeAppointment({
       status: AppointmentStatus.PENDING,
-    };
+    });
 
     repository.findOne.mockResolvedValueOnce(appointment);
     repository.save.mockImplementation(async (data: any) => data);
@@ -269,15 +341,22 @@ describe('AppointmentsService', () => {
     const result = await service.cancel('a1', patientRequester as any);
 
     expect(result.status).toBe(AppointmentStatus.CANCELLED);
+
+    expect(reportsClient.sendAppointmentSnapshot).toHaveBeenCalledWith(
+      expect.objectContaining({
+        appointment_id: 'a1',
+        doctor_id: 'd1',
+        patient_id: 'p1',
+        status: 'cancelled',
+        duration_minutes: 60,
+      }),
+    );
   });
 
   it('confirm debe cambiar status a CONFIRMED', async () => {
-    const appointment = {
-      id: 'a1',
-      patientId: 'p1',
-      dentistId: 'd1',
+    const appointment = makeAppointment({
       status: AppointmentStatus.PENDING,
-    };
+    });
 
     repository.findOne.mockResolvedValueOnce(appointment);
     repository.save.mockImplementation(async (data: any) => data);
@@ -285,28 +364,36 @@ describe('AppointmentsService', () => {
     const result = await service.confirm('a1', dentistRequester as any);
 
     expect(result.status).toBe(AppointmentStatus.CONFIRMED);
+
+    expect(reportsClient.sendAppointmentSnapshot).toHaveBeenCalledWith(
+      expect.objectContaining({
+        appointment_id: 'a1',
+        doctor_id: 'd1',
+        patient_id: 'p1',
+        status: 'confirmed',
+        duration_minutes: 60,
+      }),
+    );
   });
 
   it('confirm debe fallar si la cita está cancelada', async () => {
-    repository.findOne.mockResolvedValueOnce({
-      id: 'a1',
-      patientId: 'p1',
-      dentistId: 'd1',
-      status: AppointmentStatus.CANCELLED,
-    });
+    repository.findOne.mockResolvedValueOnce(
+      makeAppointment({
+        status: AppointmentStatus.CANCELLED,
+      }),
+    );
 
     await expect(
       service.confirm('a1', dentistRequester as any),
     ).rejects.toThrow(BadRequestException);
+
+    expect(reportsClient.sendAppointmentSnapshot).not.toHaveBeenCalled();
   });
 
   it('complete debe cambiar status a COMPLETED', async () => {
-    const appointment = {
-      id: 'a1',
-      patientId: 'p1',
-      dentistId: 'd1',
+    const appointment = makeAppointment({
       status: AppointmentStatus.CONFIRMED,
-    };
+    });
 
     repository.findOne.mockResolvedValueOnce(appointment);
     repository.save.mockImplementation(async (data: any) => data);
@@ -314,18 +401,29 @@ describe('AppointmentsService', () => {
     const result = await service.complete('a1', dentistRequester as any);
 
     expect(result.status).toBe(AppointmentStatus.COMPLETED);
+
+    expect(reportsClient.sendAppointmentSnapshot).toHaveBeenCalledWith(
+      expect.objectContaining({
+        appointment_id: 'a1',
+        doctor_id: 'd1',
+        patient_id: 'p1',
+        status: 'completed',
+        duration_minutes: 60,
+      }),
+    );
   });
 
   it('complete debe fallar si la cita está cancelada', async () => {
-    repository.findOne.mockResolvedValueOnce({
-      id: 'a1',
-      patientId: 'p1',
-      dentistId: 'd1',
-      status: AppointmentStatus.CANCELLED,
-    });
+    repository.findOne.mockResolvedValueOnce(
+      makeAppointment({
+        status: AppointmentStatus.CANCELLED,
+      }),
+    );
 
     await expect(
       service.complete('a1', dentistRequester as any),
     ).rejects.toThrow(BadRequestException);
+
+    expect(reportsClient.sendAppointmentSnapshot).not.toHaveBeenCalled();
   });
 });
