@@ -15,3 +15,11 @@ __pycache__/
 test-file.txt
 TAR03_Oro.pdf
 downloaded-*.pdf
+# .NET
+bin/
+obj/
+**/bin/
+**/obj/
+*.user
+*.suo
+.vs/

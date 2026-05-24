@@ -1,0 +1,6 @@
+@Dentia.Appointments.Api_HostAddress = http://localhost:5229
+
+GET {{Dentia.Appointments.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
