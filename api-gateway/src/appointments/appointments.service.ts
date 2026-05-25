@@ -1,68 +1,121 @@
-import { Inject, Injectable } from '@nestjs/common';
-import { ClientProxy } from '@nestjs/microservices';
-import { firstValueFrom } from 'rxjs';
+import { HttpException, Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
 import { RescheduleAppointmentDto } from './dto/reschedule-appointment.dto';
-import { RequestUser } from './interfaces/request-user.interface';
 
 @Injectable()
 export class AppointmentsService {
-  constructor(
-    @Inject('APPOINTMENTS_SERVICE')
-    private readonly client: ClientProxy,
-  ) {}
+  private readonly appointmentsServiceUrl =
+    process.env.APPOINTMENTS_SERVICE_URL ?? 'http://appointments-service:3002';
 
-  findAll(requester: RequestUser) {
-    return firstValueFrom(
-      this.client.send({ cmd: 'appointments.findAll' }, { requester }),
-    );
+  async findAll(authHeader: string) {
+    return this.request('/appointments', {
+      method: 'GET',
+      authHeader,
+    });
   }
 
-  findOne(id: string, requester: RequestUser) {
-    return firstValueFrom(
-      this.client.send({ cmd: 'appointments.findOne' }, { id, requester }),
-    );
+  async findOne(id: string, authHeader: string) {
+    return this.request(`/appointments/${id}`, {
+      method: 'GET',
+      authHeader,
+    });
   }
 
-  getAvailability(dentistId: string, date: string, requester: RequestUser) {
-    return firstValueFrom(
-      this.client.send(
-        { cmd: 'appointments.availability' },
-        { dentistId, date, requester },
-      ),
-    );
+  async getAvailability(dentistId: string, date: string, authHeader: string) {
+    const query = new URLSearchParams();
+
+    if (dentistId) {
+      query.set('dentistId', dentistId);
+    }
+
+    if (date) {
+      query.set('date', date);
+    }
+
+    return this.request(`/appointments/availability?${query.toString()}`, {
+      method: 'GET',
+      authHeader,
+    });
   }
 
-  create(dto: CreateAppointmentDto, requester: RequestUser) {
-    return firstValueFrom(
-      this.client.send({ cmd: 'appointments.create' }, { dto, requester }),
-    );
+  async create(dto: CreateAppointmentDto, authHeader: string) {
+    return this.request('/appointments', {
+      method: 'POST',
+      authHeader,
+      body: dto,
+    });
   }
 
-  reschedule(id: string, dto: RescheduleAppointmentDto, requester: RequestUser) {
-    return firstValueFrom(
-      this.client.send(
-        { cmd: 'appointments.reschedule' },
-        { id, dto, requester },
-      ),
-    );
+  async reschedule(id: string, dto: RescheduleAppointmentDto, authHeader: string) {
+    return this.request(`/appointments/${id}/reschedule`, {
+      method: 'PATCH',
+      authHeader,
+      body: dto,
+    });
   }
 
-  cancel(id: string, requester: RequestUser) {
-    return firstValueFrom(
-      this.client.send({ cmd: 'appointments.cancel' }, { id, requester }),
-    );
+  async cancel(id: string, authHeader: string) {
+    return this.request(`/appointments/${id}/cancel`, {
+      method: 'PATCH',
+      authHeader,
+    });
   }
 
-  confirm(id: string, requester: RequestUser) {
-    return firstValueFrom(
-      this.client.send({ cmd: 'appointments.confirm' }, { id, requester }),
-    );
+  async confirm(id: string, authHeader: string) {
+    return this.request(`/appointments/${id}/confirm`, {
+      method: 'PATCH',
+      authHeader,
+    });
   }
 
-  complete(id: string, requester: RequestUser) {
-    return firstValueFrom(
-      this.client.send({ cmd: 'appointments.complete' }, { id, requester }),
-    );
+  async complete(id: string, authHeader: string) {
+    return this.request(`/appointments/${id}/complete`, {
+      method: 'PATCH',
+      authHeader,
+    });
+  }
+
+  private async request(
+    path: string,
+    options: {
+      method: 'GET' | 'POST' | 'PATCH';
+      authHeader: string;
+      body?: unknown;
+    },
+  ) {
+    const url = `${this.appointmentsServiceUrl}${path}`;
+
+    try {
+      const response = await fetch(url, {
+        method: options.method,
+        headers: {
+          Authorization: options.authHeader,
+          'Content-Type': 'application/json',
+        },
+        body: options.body ? JSON.stringify(options.body) : undefined,
+      });
+
+      const text = await response.text();
+      const data = text ? JSON.parse(text) : null;
+
+      if (!response.ok) {
+        const message =
+          data?.message ??
+          data?.title ??
+          `appointments-service error: ${response.status}`;
+
+        throw new HttpException(message, response.status);
+      }
+
+      return data;
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      throw new ServiceUnavailableException(
+        'appointments-service is unavailable',
+      );
+    }
   }
 }

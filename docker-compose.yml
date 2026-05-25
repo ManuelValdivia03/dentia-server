@@ -218,8 +218,7 @@ services:
     environment:
       PORT: ${API_GATEWAY_PORT}
       AUTH_SERVICE_URL: http://auth-service:3001
-      APPOINTMENTS_TCP_HOST: appointments-service
-      APPOINTMENTS_TCP_PORT: ${APPOINTMENTS_TCP_PORT}
+      APPOINTMENTS_SERVICE_URL: http://appointments-service:3002
       PRESCRIPTIONS_TCP_HOST: prescriptions-service
       PRESCRIPTIONS_TCP_PORT: ${PRESCRIPTIONS_TCP_PORT}
       CHAT_SERVICE_URL: http://chat-service:3004

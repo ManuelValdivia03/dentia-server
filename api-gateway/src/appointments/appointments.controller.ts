@@ -8,6 +8,7 @@ import {
   Query,
   Req,
   UseGuards,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { Request } from 'express';
 import { AppointmentsService } from './appointments.service';
@@ -31,7 +32,7 @@ export class AppointmentsController {
   @Get()
   @Roles(UserRole.ADMIN, UserRole.PATIENT, UserRole.DENTIST)
   findAll(@Req() req: AuthenticatedRequest) {
-    return this.appointmentsService.findAll(req.user);
+    return this.appointmentsService.findAll(this.getAuthHeader(req));
   }
 
   @Get('availability')
@@ -41,13 +42,17 @@ export class AppointmentsController {
     @Query('date') date: string,
     @Req() req: AuthenticatedRequest,
   ) {
-    return this.appointmentsService.getAvailability(dentistId, date, req.user);
+    return this.appointmentsService.getAvailability(
+      dentistId,
+      date,
+      this.getAuthHeader(req),
+    );
   }
 
   @Get(':id')
   @Roles(UserRole.ADMIN, UserRole.PATIENT, UserRole.DENTIST)
   findOne(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
-    return this.appointmentsService.findOne(id, req.user);
+    return this.appointmentsService.findOne(id, this.getAuthHeader(req));
   }
 
   @Post()
@@ -57,7 +62,7 @@ export class AppointmentsController {
       dto.patientId = req.user.domainId;
     }
 
-    return this.appointmentsService.create(dto, req.user);
+    return this.appointmentsService.create(dto, this.getAuthHeader(req));
   }
 
   @Patch(':id/reschedule')
@@ -67,24 +72,38 @@ export class AppointmentsController {
     @Body() dto: RescheduleAppointmentDto,
     @Req() req: AuthenticatedRequest,
   ) {
-    return this.appointmentsService.reschedule(id, dto, req.user);
+    return this.appointmentsService.reschedule(
+      id,
+      dto,
+      this.getAuthHeader(req),
+    );
   }
 
   @Patch(':id/cancel')
   @Roles(UserRole.ADMIN, UserRole.PATIENT, UserRole.DENTIST)
   cancel(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
-    return this.appointmentsService.cancel(id, req.user);
+    return this.appointmentsService.cancel(id, this.getAuthHeader(req));
   }
 
   @Patch(':id/confirm')
   @Roles(UserRole.ADMIN, UserRole.DENTIST)
   confirm(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
-    return this.appointmentsService.confirm(id, req.user);
+    return this.appointmentsService.confirm(id, this.getAuthHeader(req));
   }
 
   @Patch(':id/complete')
   @Roles(UserRole.ADMIN, UserRole.DENTIST)
   complete(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
-    return this.appointmentsService.complete(id, req.user);
+    return this.appointmentsService.complete(id, this.getAuthHeader(req));
+  }
+
+  private getAuthHeader(req: Request): string {
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader) {
+      throw new UnauthorizedException('Authorization header is required');
+    }
+
+    return authHeader;
   }
 }
