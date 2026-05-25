@@ -2,6 +2,7 @@ using System.Text.Json.Serialization;
 using Dentia.Appointments.Api.Application.Common;
 using Dentia.Appointments.Api.Application.Security;
 using Dentia.Appointments.Api.Application.Services;
+using Dentia.Appointments.Api.Application.Events;
 using Dentia.Appointments.Api.Domain.Enums;
 using Dentia.Appointments.Api.Infrastructure.Persistence;
 using Dentia.Appointments.Api.Application.Reports;
@@ -44,6 +45,7 @@ builder.Services
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 builder.Services.AddScoped<IAppointmentsService, AppointmentsService>();
+builder.Services.AddScoped<IAppointmentEventsPublisher, AppointmentEventsPublisher>();
 builder.Services.AddHttpClient<IReportsClient, ReportsClient>();
 // Swagger
 builder.Services.AddEndpointsApiExplorer();

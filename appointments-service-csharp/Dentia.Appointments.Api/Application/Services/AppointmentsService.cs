@@ -2,6 +2,7 @@ using Dentia.Appointments.Api.Application.Common;
 using Dentia.Appointments.Api.Application.DTOs;
 using Dentia.Appointments.Api.Application.Security;
 using Dentia.Appointments.Api.Application.Reports;
+using Dentia.Appointments.Api.Application.Events;
 using Dentia.Appointments.Api.Domain.Entities;
 using Dentia.Appointments.Api.Domain.Enums;
 using Dentia.Appointments.Api.Infrastructure.Persistence;
@@ -26,13 +27,16 @@ public class AppointmentsService : IAppointmentsService
 {
     private readonly AppointmentsDbContext _db;
     private readonly IReportsClient _reportsClient;
+    private readonly IAppointmentEventsPublisher _eventsPublisher;
 
     public AppointmentsService(
         AppointmentsDbContext db,
-        IReportsClient reportsClient)
+        IReportsClient reportsClient,
+        IAppointmentEventsPublisher eventsPublisher)
     {
         _db = db;
         _reportsClient = reportsClient;
+        _eventsPublisher = eventsPublisher;
     }
 
     public async Task<List<Appointment>> FindAllAsync(RequestUser requester)
@@ -144,6 +148,7 @@ public class AppointmentsService : IAppointmentsService
         _db.Appointments.Add(appointment);
         await _db.SaveChangesAsync();
         await _reportsClient.SendAppointmentSnapshotAsync(appointment);
+        await _eventsPublisher.PublishAppointmentCreatedAsync(appointment);
 
         return appointment;
     }
