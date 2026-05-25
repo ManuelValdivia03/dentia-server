@@ -1,6 +1,7 @@
 using Dentia.Appointments.Api.Application.Common;
 using Dentia.Appointments.Api.Application.DTOs;
 using Dentia.Appointments.Api.Application.Security;
+using Dentia.Appointments.Api.Application.Reports;
 using Dentia.Appointments.Api.Domain.Entities;
 using Dentia.Appointments.Api.Domain.Enums;
 using Dentia.Appointments.Api.Infrastructure.Persistence;
@@ -24,10 +25,14 @@ public interface IAppointmentsService
 public class AppointmentsService : IAppointmentsService
 {
     private readonly AppointmentsDbContext _db;
+    private readonly IReportsClient _reportsClient;
 
-    public AppointmentsService(AppointmentsDbContext db)
+    public AppointmentsService(
+        AppointmentsDbContext db,
+        IReportsClient reportsClient)
     {
         _db = db;
+        _reportsClient = reportsClient;
     }
 
     public async Task<List<Appointment>> FindAllAsync(RequestUser requester)
@@ -138,6 +143,7 @@ public class AppointmentsService : IAppointmentsService
 
         _db.Appointments.Add(appointment);
         await _db.SaveChangesAsync();
+        await _reportsClient.SendAppointmentSnapshotAsync(appointment);
 
         return appointment;
     }
@@ -169,6 +175,7 @@ public class AppointmentsService : IAppointmentsService
         appointment.UpdatedAt = ToDbTimestamp(DateTime.UtcNow);
 
         await _db.SaveChangesAsync();
+        await _reportsClient.SendAppointmentSnapshotAsync(appointment);
 
         return appointment;
     }
@@ -183,7 +190,7 @@ public class AppointmentsService : IAppointmentsService
         appointment.UpdatedAt = ToDbTimestamp(DateTime.UtcNow);
 
         await _db.SaveChangesAsync();
-
+        await _reportsClient.SendAppointmentSnapshotAsync(appointment);
         return appointment;
     }
 
@@ -206,6 +213,7 @@ public class AppointmentsService : IAppointmentsService
         appointment.UpdatedAt = ToDbTimestamp(DateTime.UtcNow);
 
         await _db.SaveChangesAsync();
+        await _reportsClient.SendAppointmentSnapshotAsync(appointment);
 
         return appointment;
     }
@@ -229,7 +237,7 @@ public class AppointmentsService : IAppointmentsService
         appointment.UpdatedAt = ToDbTimestamp(DateTime.UtcNow);
 
         await _db.SaveChangesAsync();
-
+        await _reportsClient.SendAppointmentSnapshotAsync(appointment);
         return appointment;
     }
 

@@ -4,6 +4,7 @@ using Dentia.Appointments.Api.Application.Security;
 using Dentia.Appointments.Api.Application.Services;
 using Dentia.Appointments.Api.Domain.Enums;
 using Dentia.Appointments.Api.Infrastructure.Persistence;
+using Dentia.Appointments.Api.Application.Reports;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
@@ -43,7 +44,7 @@ builder.Services
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 builder.Services.AddScoped<IAppointmentsService, AppointmentsService>();
-
+builder.Services.AddHttpClient<IReportsClient, ReportsClient>();
 // Swagger
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
