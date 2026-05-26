@@ -89,6 +89,12 @@ builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppointmentsDbContext>();
+    db.Database.EnsureCreated();
+}
+
 app.UseMiddleware<ErrorHandlingMiddleware>();
 
 app.UseSwagger();
