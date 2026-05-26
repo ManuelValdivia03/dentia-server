@@ -10,6 +10,7 @@ services:
       - "443:443"
     volumes:
       - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - /opt/dentia/dentia-client/dist:/srv/dentia-client:ro
       - caddy_data:/data
       - caddy_config:/config
     networks:

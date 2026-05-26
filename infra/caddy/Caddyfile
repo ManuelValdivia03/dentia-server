@@ -1,3 +1,9 @@
+dentia-app.me, www.dentia-app.me {
+  root * /srv/dentia-client
+  try_files {path} /index.html
+  file_server
+}
+
 api.dentia-app.me {
   reverse_proxy api-gateway:3000
 }
