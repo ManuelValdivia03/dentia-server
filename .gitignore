@@ -22,4 +22,5 @@ obj/
 **/obj/
 *.user
 *.suo
-.vs/
+.vs/.env.production
+.env.production.bak.*

@@ -1,0 +1,93 @@
+services:
+  caddy:
+    image: caddy:2-alpine
+    container_name: dentia-caddy
+    restart: unless-stopped
+    depends_on:
+      - api-gateway
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - dentia-network
+
+  postgres:
+    ports: !reset []
+
+  rabbitmq:
+    ports: !reset []
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
+
+  auth-service:
+    ports: !reset []
+    environment:
+      NODE_ENV: production
+
+  appointments-service:
+    ports: !reset []
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY}
+      RABBITMQ_URL: ${RABBITMQ_URL}
+
+  prescriptions-service:
+    ports: !reset []
+    environment:
+      NODE_ENV: production
+
+  chat-mongo:
+    ports: !reset []
+    networks:
+      - dentia-network
+
+  files-mongo:
+    ports: !reset []
+    networks:
+      - dentia-network
+
+  chat-service:
+    ports: !reset []
+    networks:
+      - dentia-network
+    environment:
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY}
+      MONGODB_URI: ${CHAT_MONGODB_URI}
+
+  files-service:
+    ports: !reset []
+    networks:
+      - dentia-network
+    environment:
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY}
+      MONGODB_URI: ${FILES_MONGODB_URI}
+
+  neo4j:
+    restart: unless-stopped
+    ports: !reset []
+    environment:
+      NEO4J_AUTH: ${NEO4J_AUTH}
+
+  reports-service:
+    restart: unless-stopped
+    ports: !reset []
+    environment:
+      NEO4J_URI: ${NEO4J_URI}
+      NEO4J_USER: ${NEO4J_USER}
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY}
+
+  api-gateway:
+    ports: !reset []
+    environment:
+      NODE_ENV: production
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY}
+
+volumes:
+  caddy_data:
+  caddy_config:

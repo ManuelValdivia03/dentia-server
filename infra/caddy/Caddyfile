@@ -1,0 +1,3 @@
+api.dentia-app.me {
+  reverse_proxy api-gateway:3000
+}
