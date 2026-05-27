@@ -128,18 +128,22 @@ services:
     container_name: dentia-chat-mongo
     restart: unless-stopped
     ports:
-      - "27018:27017"
+      - "27019:27017"
     volumes:
       - chat_mongo_data:/data/db
+    networks:
+      - dentia-network
     
   files-mongo:
     image: mongo:7
     container_name: dentia-files-mongo
     restart: unless-stopped
     ports:
-      - "27019:27017"
+      - "27018:27017"
     volumes:
       - files_mongo_data:/data/db
+    networks:
+      - dentia-network
 
   chat-service:
     build:
@@ -154,9 +158,11 @@ services:
       PORT: 3004
       MONGODB_URI: mongodb://chat-mongo:27017/dentia_chat
       APPOINTMENTS_SERVICE_URL: http://appointments-service:3002
-      INTERNAL_API_KEY: dev-internal-key
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY}
     ports:
       - "3004:3004"
+    networks:
+      - dentia-network
 
   neo4j:
     image: neo4j:5
@@ -192,22 +198,27 @@ services:
     
   files-service:
     build:
-      context: ./files-service
+      context: ./files-service-csharp/FilesService
       dockerfile: Dockerfile
     container_name: dentia-files-service
     restart: unless-stopped
-    depends_on:
-      - files-mongo
+    ports:
+      - "3005:8080"
     environment:
-      PORT: 3005
-      MONGODB_URI: mongodb://files-mongo:27017/dentia_files
-      FILES_UPLOAD_DIR: /app/uploads
-      MAX_FILE_SIZE_MB: 10
-      INTERNAL_API_KEY: dev-internal-key
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      Mongo__ConnectionString: mongodb://files-mongo:27017
+      Mongo__DatabaseName: dentia_files
+      Mongo__FilesCollection: clinical_files
+      Storage__Path: /app/uploads
+      Jwt__Secret: ${JWT_SECRET}
+      JWT_SECRET: ${JWT_SECRET}
     volumes:
       - files_uploads:/app/uploads
-    ports:
-      - "3005:3005"
+    depends_on:
+      - files-mongo
+    networks:
+      - dentia-network
 
   api-gateway:
     build:
@@ -222,7 +233,7 @@ services:
       PRESCRIPTIONS_TCP_HOST: prescriptions-service
       PRESCRIPTIONS_TCP_PORT: ${PRESCRIPTIONS_TCP_PORT}
       CHAT_SERVICE_URL: http://chat-service:3004
-      FILES_SERVICE_URL: http://files-service:3005
+      FILES_SERVICE_URL: http://files-service:8080
       REPORTS_SERVICE_URL: http://reports-service:3006
       INTERNAL_API_KEY: dev-internal-key
       JWT_SECRET: ${JWT_SECRET}
