@@ -1,9 +1,10 @@
 using System.Security.Claims;
+using System.Text.Json;
+using FilesService.DTOs;
 using FilesService.Models;
 using FilesService.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using FilesService.DTOs;
 
 namespace FilesService.Controllers;
 
@@ -14,6 +15,8 @@ public class FilesController : ControllerBase
 {
     private readonly FileMetadataService _metadataService;
     private readonly FileStorageService _storageService;
+    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly IConfiguration _configuration;
 
     private static readonly string[] AllowedContentTypes =
     {
@@ -24,10 +27,14 @@ public class FilesController : ControllerBase
 
     public FilesController(
         FileMetadataService metadataService,
-        FileStorageService storageService)
+        FileStorageService storageService,
+        IHttpClientFactory httpClientFactory,
+        IConfiguration configuration)
     {
         _metadataService = metadataService;
         _storageService = storageService;
+        _httpClientFactory = httpClientFactory;
+        _configuration = configuration;
     }
 
     [HttpPost("upload")]
@@ -44,10 +51,36 @@ public class FilesController : ControllerBase
         if (!AllowedContentTypes.Contains(file.ContentType))
             return BadRequest(new { message = "Tipo de archivo no permitido." });
 
-        var userId = GetUserId();
+        var subjectId = GetSubjectId();
+        var domainId = GetDomainId();
         var role = GetRole();
 
-        if (role == "PATIENT" && userId != patientId)
+        if (role == "PATIENT")
+        {
+            if (string.IsNullOrWhiteSpace(domainId))
+                return Forbid();
+
+            patientId = domainId;
+        }
+
+        if (role == "DENTIST")
+        {
+            if (string.IsNullOrWhiteSpace(patientId))
+                return BadRequest(new { message = "patientId es requerido para dentista." });
+
+            var allowed = await HasPatientDentistRelationAsync(patientId, domainId);
+
+            if (!allowed)
+                return Forbid();
+        }
+
+        if (role == "ADMIN")
+        {
+            if (string.IsNullOrWhiteSpace(patientId))
+                return BadRequest(new { message = "patientId es requerido." });
+        }
+
+        if (role != "ADMIN" && role != "PATIENT" && role != "DENTIST")
             return Forbid();
 
         var saved = await _storageService.SaveAsync(file);
@@ -59,7 +92,7 @@ public class FilesController : ControllerBase
             ContentType = file.ContentType,
             Size = file.Length,
             PatientId = patientId,
-            UploadedByUserId = userId,
+            UploadedByUserId = subjectId,
             UploadedByRole = role,
             StoragePath = saved.FullPath,
             CreatedAt = DateTime.UtcNow
@@ -73,19 +106,29 @@ public class FilesController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetAll([FromQuery] string? patientId)
     {
-        var userId = GetUserId();
         var role = GetRole();
+        var domainId = GetDomainId();
 
-        if (role == "admin")
+        if (role == "ADMIN")
+        {
+            if (!string.IsNullOrWhiteSpace(patientId))
+                return Ok(await _metadataService.FindByPatientAsync(patientId));
+
             return Ok(await _metadataService.FindAllAsync());
+        }
 
-        if (role == "patient")
-            return Ok(await _metadataService.FindByPatientAsync(userId));
+        if (role == "PATIENT")
+            return Ok(await _metadataService.FindByPatientAsync(domainId));
 
-        if (role == "dentist")
+        if (role == "DENTIST")
         {
             if (string.IsNullOrWhiteSpace(patientId))
                 return BadRequest(new { message = "patientId es requerido para dentista." });
+
+            var allowed = await HasPatientDentistRelationAsync(patientId, domainId);
+
+            if (!allowed)
+                return Forbid();
 
             return Ok(await _metadataService.FindByPatientAsync(patientId));
         }
@@ -101,7 +144,7 @@ public class FilesController : ControllerBase
         if (file == null)
             return NotFound();
 
-        if (!CanAccess(file))
+        if (!await CanAccessAsync(file))
             return Forbid();
 
         return Ok(file);
@@ -115,7 +158,7 @@ public class FilesController : ControllerBase
         if (file == null)
             return NotFound();
 
-        if (!CanAccess(file))
+        if (!await CanAccessAsync(file))
             return Forbid();
 
         if (!_storageService.Exists(file.StoragePath))
@@ -134,7 +177,7 @@ public class FilesController : ControllerBase
         if (file == null)
             return NotFound();
 
-        if (!CanAccess(file))
+        if (!await CanAccessAsync(file))
             return Forbid();
 
         await _metadataService.SoftDeleteAsync(id);
@@ -143,25 +186,73 @@ public class FilesController : ControllerBase
         return NoContent();
     }
 
-    private bool CanAccess(ClinicalFile file)
+    private async Task<bool> CanAccessAsync(ClinicalFile file)
     {
-        var userId = GetUserId();
         var role = GetRole();
+        var domainId = GetDomainId();
 
         return role switch
         {
             "ADMIN" => true,
-            "PATIENT" => file.PatientId == userId,
-            "DENTIST" => true,
+            "PATIENT" => file.PatientId == domainId,
+            "DENTIST" => await HasPatientDentistRelationAsync(file.PatientId, domainId),
             _ => false
         };
     }
 
-    private string GetUserId()
+    private async Task<bool> HasPatientDentistRelationAsync(string patientId, string dentistId)
+    {
+        if (string.IsNullOrWhiteSpace(patientId) || string.IsNullOrWhiteSpace(dentistId))
+            return false;
+
+        var baseUrl = _configuration["APPOINTMENTS_SERVICE_URL"] ?? "http://appointments-service:3002";
+        var internalKey = _configuration["INTERNAL_API_KEY"] ?? "dev-internal-key";
+
+        var url =
+            $"{baseUrl}/internal/relationships/patient-dentist" +
+            $"?patientId={Uri.EscapeDataString(patientId)}" +
+            $"&dentistId={Uri.EscapeDataString(dentistId)}";
+
+        try
+        {
+            var client = _httpClientFactory.CreateClient();
+
+            using var request = new HttpRequestMessage(HttpMethod.Get, url);
+            request.Headers.Add("x-internal-api-key", internalKey);
+
+            using var response = await client.SendAsync(request);
+
+            if (!response.IsSuccessStatusCode)
+                return false;
+
+            await using var stream = await response.Content.ReadAsStreamAsync();
+
+            var result = await JsonSerializer.DeserializeAsync<RelationResponse>(
+                stream,
+                new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                }
+            );
+
+            return result?.Allowed == true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private string GetSubjectId()
     {
         return User.FindFirstValue(ClaimTypes.NameIdentifier)
             ?? User.FindFirstValue("sub")
             ?? string.Empty;
+    }
+
+    private string GetDomainId()
+    {
+        return User.FindFirstValue("domainId") ?? string.Empty;
     }
 
     private string GetRole()
@@ -171,5 +262,10 @@ public class FilesController : ControllerBase
             ?? User.FindFirstValue("role")
             ?? string.Empty
         ).ToUpperInvariant();
+    }
+
+    private sealed class RelationResponse
+    {
+        public bool Allowed { get; set; }
     }
 }

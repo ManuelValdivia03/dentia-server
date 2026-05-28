@@ -7,7 +7,7 @@ export class FilesService {
   private readonly filesServiceUrl =
     process.env.FILES_SERVICE_URL ?? 'http://localhost:3005';
 
-  async upload(file: Express.Multer.File, body: any, user: any) {
+  async upload(file: Express.Multer.File, body: any, authorization: string) {
     const form = new FormData();
 
     form.append('file', file.buffer, {
@@ -20,48 +20,49 @@ export class FilesService {
       form.append('patientId', body.patientId);
     }
 
-    if (body.appointmentId) {
-      form.append('appointmentId', body.appointmentId);
-    }
-
-    if (body.prescriptionId) {
-      form.append('prescriptionId', body.prescriptionId);
-    }
-
     return this.forward(() =>
-      axios.post(`${this.filesServiceUrl}/files`, form, {
+      axios.post(`${this.filesServiceUrl}/api/files/upload`, form, {
         headers: {
           ...form.getHeaders(),
-          ...this.buildUserHeaders(user),
+          Authorization: authorization,
         },
         maxBodyLength: Infinity,
       }),
     );
   }
 
-  async findAll(query: any, user: any) {
+  async findAll(query: any, authorization: string) {
     return this.forward(() =>
-      axios.get(`${this.filesServiceUrl}/files`, {
+      axios.get(`${this.filesServiceUrl}/api/files`, {
         params: query,
-        headers: this.buildUserHeaders(user),
+        headers: {
+          Authorization: authorization,
+        },
       }),
     );
   }
 
-  async findOne(id: string, user: any) {
+  async findOne(id: string, authorization: string) {
     return this.forward(() =>
-      axios.get(`${this.filesServiceUrl}/files/${id}`, {
-        headers: this.buildUserHeaders(user),
+      axios.get(`${this.filesServiceUrl}/api/files/${id}`, {
+        headers: {
+          Authorization: authorization,
+        },
       }),
     );
   }
 
-  async download(id: string, user: any) {
+  async download(id: string, authorization: string) {
     try {
-      const response = await axios.get(`${this.filesServiceUrl}/files/${id}/download`, {
-        headers: this.buildUserHeaders(user),
-        responseType: 'stream',
-      });
+      const response = await axios.get(
+        `${this.filesServiceUrl}/api/files/${id}/download`,
+        {
+          headers: {
+            Authorization: authorization,
+          },
+          responseType: 'stream',
+        },
+      );
 
       return {
         stream: response.data,
@@ -72,20 +73,14 @@ export class FilesService {
     }
   }
 
-  async remove(id: string, user: any) {
+  async remove(id: string, authorization: string) {
     return this.forward(() =>
-      axios.delete(`${this.filesServiceUrl}/files/${id}`, {
-        headers: this.buildUserHeaders(user),
+      axios.delete(`${this.filesServiceUrl}/api/files/${id}`, {
+        headers: {
+          Authorization: authorization,
+        },
       }),
     );
-  }
-
-  private buildUserHeaders(user: any) {
-    return {
-      'x-user-id': user.domainId ?? user.sub ?? user.id,
-      'x-user-role': user.role,
-      'x-internal-api-key': process.env.INTERNAL_API_KEY ?? 'dev-internal-key',
-    };
   }
 
   private async forward(requestFn: () => Promise<any>) {

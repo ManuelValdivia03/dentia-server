@@ -9,6 +9,7 @@ import {
   Req,
   Res,
   StreamableFile,
+  UnauthorizedException,
   UploadedFile,
   UseGuards,
   UseInterceptors,
@@ -40,26 +41,26 @@ export class FilesController {
       throw new BadRequestException('Archivo requerido');
     }
 
-    return this.filesService.upload(file, req.body, req.user);
+    return this.filesService.upload(file, req.body, this.getAuthHeader(req));
   }
 
   @Get()
   findAll(@Query() query: any, @Req() req: any) {
-    return this.filesService.findAll(query, req.user);
+    return this.filesService.findAll(query, this.getAuthHeader(req));
   }
 
   @Get(':id')
   findOne(@Param('id') id: string, @Req() req: any) {
-    return this.filesService.findOne(id, req.user);
+    return this.filesService.findOne(id, this.getAuthHeader(req));
   }
 
-    @Get(':id/download')
+  @Get(':id/download')
   async download(
     @Param('id') id: string,
     @Req() req: any,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const result = await this.filesService.download(id, req.user);
+    const result = await this.filesService.download(id, this.getAuthHeader(req));
 
     const contentType = result.headers['content-type'];
     const contentDisposition = result.headers['content-disposition'];
@@ -77,6 +78,16 @@ export class FilesController {
 
   @Delete(':id')
   remove(@Param('id') id: string, @Req() req: any) {
-    return this.filesService.remove(id, req.user);
+    return this.filesService.remove(id, this.getAuthHeader(req));
+  }
+
+  private getAuthHeader(req: any): string {
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader) {
+      throw new UnauthorizedException('Authorization header is required');
+    }
+
+    return authHeader;
   }
 }

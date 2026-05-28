@@ -11,6 +11,7 @@ builder.Services.Configure<MongoSettings>(
 
 builder.Services.AddSingleton<FileMetadataService>();
 builder.Services.AddSingleton<FileStorageService>();
+builder.Services.AddHttpClient();
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();

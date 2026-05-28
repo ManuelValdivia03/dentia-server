@@ -213,6 +213,8 @@ services:
       Storage__Path: /app/uploads
       Jwt__Secret: ${JWT_SECRET}
       JWT_SECRET: ${JWT_SECRET}
+      APPOINTMENTS_SERVICE_URL: http://appointments-service:3002
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY}
     volumes:
       - files_uploads:/app/uploads
     depends_on:
