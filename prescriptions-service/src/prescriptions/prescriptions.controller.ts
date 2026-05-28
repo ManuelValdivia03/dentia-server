@@ -34,4 +34,12 @@ export class PrescriptionsController {
       payload.requester,
     );
   }
+
+  @MessagePattern({ cmd: 'prescriptions.generatePdf' })
+  generatePdf(
+    @Payload()
+    payload: { id: string; requester: RequestUser },
+  ) {
+    return this.prescriptionsService.generatePdf(payload.id, payload.requester);
+  }
 }

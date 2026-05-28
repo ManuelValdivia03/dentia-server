@@ -2,9 +2,11 @@ import {
   Body,
   Controller,
   Get,
+  Header,
   Param,
   Post,
   Req,
+  StreamableFile,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -70,6 +72,18 @@ export class PrescriptionsController {
     return this.prescriptionsService.findOne(id, req.user);
   }
 
+  @Get('prescriptions/:id/pdf')
+  @Roles(UserRole.ADMIN, UserRole.DENTIST, UserRole.PATIENT)
+  @Header('Content-Type', 'application/pdf')
+  async generatePdf(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
+    const result = await this.prescriptionsService.generatePdf(id, req.user);
+
+    return new StreamableFile(Buffer.from(result.base64, 'base64'), {
+      disposition: `attachment; filename="${result.filename}"`,
+      type: result.contentType,
+    });
+  }
+
   @Get('appointments/:appointmentId/prescriptions')
   @Roles(UserRole.ADMIN, UserRole.DENTIST, UserRole.PATIENT)
   @ApiOperation({ summary: 'Listar recetas asociadas a una cita' })
@@ -78,6 +92,7 @@ export class PrescriptionsController {
     example: 'appointment-id',
     description: 'ID de la cita.',
   })
+
   @ApiOkResponse({ description: 'Listado de recetas asociadas a la cita.' })
   @ApiNotFoundResponse({ description: 'Cita o recetas no encontradas.' })
   @ApiForbiddenResponse({ description: 'No tiene permiso para consultar recetas de esta cita.' })

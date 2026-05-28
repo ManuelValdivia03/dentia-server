@@ -31,4 +31,13 @@ export class PrescriptionsService {
       ),
     );
   }
+
+  generatePdf(id: string, requester: RequestUser) {
+    return firstValueFrom(
+      this.client.send(
+        { cmd: 'prescriptions.generatePdf' },
+        { id, requester },
+      ),
+    );
+  }
 }

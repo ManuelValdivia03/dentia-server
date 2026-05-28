@@ -10,6 +10,7 @@ import { Prescription } from './entities/prescription.entity';
 import { CreatePrescriptionDto } from './dto/create-prescription.dto';
 import { PrescriptionStatus } from './enums/prescription-status.enum';
 import { RequestUser, RequestUserRole } from './interfaces/request-user.interface';
+import { generatePrescriptionPdf } from './pdf/prescription-pdf.generator';
 
 @Injectable()
 export class PrescriptionsService {
@@ -68,6 +69,12 @@ export class PrescriptionsService {
 
     this.ensureCanViewPrescription(prescription, requester);
     return prescription;
+  }
+
+  async generatePdf(id: string, requester: RequestUser) {
+    const prescription = await this.findOne(id, requester);
+
+    return generatePrescriptionPdf(prescription);
   }
 
   async findByAppointment(appointmentId: string, requester: RequestUser) {
