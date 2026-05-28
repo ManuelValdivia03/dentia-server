@@ -75,6 +75,21 @@ export class AppointmentsService {
     });
   }
 
+  async createRating(id: string, dto: any, authHeader: string) {
+    return this.request(`/appointments/${id}/rating`, {
+      method: 'POST',
+      authHeader,
+      body: dto,
+    });
+  }
+
+  async getDentistRatingsSummary(dentistId: string, authHeader: string) {
+    return this.request(`/dentists/${dentistId}/ratings/summary`, {
+      method: 'GET',
+      authHeader,
+    });
+  }
+
   private async request(
     path: string,
     options: {

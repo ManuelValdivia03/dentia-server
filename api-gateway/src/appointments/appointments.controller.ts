@@ -97,6 +97,20 @@ export class AppointmentsController {
     return this.appointmentsService.complete(id, this.getAuthHeader(req));
   }
 
+  @Post(':id/rating')
+  @Roles(UserRole.PATIENT)
+  createRating(
+    @Param('id') id: string,
+    @Body() dto: any,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.appointmentsService.createRating(
+      id,
+      dto,
+      this.getAuthHeader(req),
+    );
+  }
+
   private getAuthHeader(req: Request): string {
     const authHeader = req.headers.authorization;
 

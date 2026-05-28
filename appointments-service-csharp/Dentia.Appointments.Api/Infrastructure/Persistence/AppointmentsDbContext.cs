@@ -12,6 +12,7 @@ public class AppointmentsDbContext : DbContext
     }
 
     public DbSet<Appointment> Appointments => Set<Appointment>();
+    public DbSet<AppointmentRating> AppointmentRatings => Set<AppointmentRating>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -65,6 +66,51 @@ public class AppointmentsDbContext : DbContext
             entity.Property(x => x.UpdatedAt)
                 .HasColumnName("updatedAt")
                 .HasColumnType("timestamp without time zone");
+        });
+
+        modelBuilder.Entity<AppointmentRating>(entity =>
+        {
+            entity.ToTable("appointment_ratings");
+
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.Id)
+                .HasColumnName("id")
+                .HasColumnType("uuid");
+
+            entity.Property(x => x.AppointmentId)
+                .HasColumnName("appointmentId")
+                .HasColumnType("uuid")
+                .IsRequired();
+
+            entity.Property(x => x.PatientId)
+                .HasColumnName("patientId")
+                .IsRequired();
+
+            entity.Property(x => x.DentistId)
+                .HasColumnName("dentistId")
+                .IsRequired();
+
+            entity.Property(x => x.Score)
+                .HasColumnName("score")
+                .IsRequired();
+
+            entity.Property(x => x.Comment)
+                .HasColumnName("comment")
+                .HasColumnType("text");
+
+            entity.Property(x => x.CreatedAt)
+                .HasColumnName("createdAt")
+                .HasColumnType("timestamp without time zone");
+
+            entity.Property(x => x.UpdatedAt)
+                .HasColumnName("updatedAt")
+                .HasColumnType("timestamp without time zone");
+
+            entity.HasIndex(x => x.AppointmentId)
+                .IsUnique();
+
+            entity.HasIndex(x => x.DentistId);
         });
     }
 }

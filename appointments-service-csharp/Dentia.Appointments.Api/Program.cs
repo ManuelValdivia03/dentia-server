@@ -45,6 +45,7 @@ builder.Services
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 builder.Services.AddScoped<IAppointmentsService, AppointmentsService>();
+builder.Services.AddScoped<IRatingsService, RatingsService>();
 builder.Services.AddScoped<IAppointmentEventsPublisher, AppointmentEventsPublisher>();
 builder.Services.AddHttpClient<IReportsClient, ReportsClient>();
 // Swagger
@@ -93,6 +94,24 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppointmentsDbContext>();
     db.Database.EnsureCreated();
+
+    db.Database.ExecuteSqlRaw("""
+        CREATE TABLE IF NOT EXISTS "appointment_ratings" (
+            "id" uuid PRIMARY KEY,
+            "appointmentId" uuid NOT NULL UNIQUE,
+            "patientId" text NOT NULL,
+            "dentistId" text NOT NULL,
+            "score" integer NOT NULL CHECK ("score" >= 1 AND "score" <= 5),
+            "comment" text NULL,
+            "createdAt" timestamp without time zone NOT NULL,
+            "updatedAt" timestamp without time zone NOT NULL
+        );
+    """);
+
+    db.Database.ExecuteSqlRaw("""
+        CREATE INDEX IF NOT EXISTS "IX_appointment_ratings_dentistId"
+        ON "appointment_ratings" ("dentistId");
+    """);
 }
 
 app.UseMiddleware<ErrorHandlingMiddleware>();
