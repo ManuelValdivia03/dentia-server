@@ -14,6 +14,11 @@ dentia-app.me, www.dentia-app.me {
 }
 
 api.dentia-app.me {
+  # Allow chat/file media uploads up to 50MB.
+  request_body {
+    max_size 50MB
+  }
+
   reverse_proxy api-gateway:3000
 
   header {
