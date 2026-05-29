@@ -18,11 +18,16 @@ public class FilesController : ControllerBase
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IConfiguration _configuration;
 
+    private const long MaxUploadBytes = 52_428_800; // 50 MB
+
     private static readonly string[] AllowedContentTypes =
     {
         "image/jpeg",
         "image/png",
-        "application/pdf"
+        "image/webp",
+        "application/pdf",
+        "video/mp4",
+        "video/webm"
     };
 
     public FilesController(
@@ -39,7 +44,7 @@ public class FilesController : ControllerBase
 
     [HttpPost("upload")]
     [Consumes("multipart/form-data")]
-    [RequestSizeLimit(10_000_000)]
+    [RequestSizeLimit(MaxUploadBytes)]
     public async Task<IActionResult> Upload([FromForm] FileUploadRequest request)
     {
         var file = request.File;
@@ -47,6 +52,9 @@ public class FilesController : ControllerBase
 
         if (file == null || file.Length == 0)
             return BadRequest(new { message = "Archivo requerido." });
+
+        if (file.Length > MaxUploadBytes)
+            return BadRequest(new { message = "El archivo excede el tamaño máximo permitido (50MB)." });
 
         if (!AllowedContentTypes.Contains(file.ContentType))
             return BadRequest(new { message = "Tipo de archivo no permitido." });

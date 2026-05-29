@@ -2,9 +2,23 @@ using System.Text;
 using FilesService.Services;
 using FilesService.Settings;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Allow uploads up to 50 MB (images + short videos). Kestrel defaults to 30 MB.
+const long maxUploadBytes = 52_428_800;
+
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.Limits.MaxRequestBodySize = maxUploadBytes;
+});
+
+builder.Services.Configure<FormOptions>(options =>
+{
+    options.MultipartBodyLengthLimit = maxUploadBytes;
+});
 
 builder.Services.Configure<MongoSettings>(
     builder.Configuration.GetSection("Mongo"));
