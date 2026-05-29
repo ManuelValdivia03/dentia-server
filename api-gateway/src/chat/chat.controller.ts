@@ -7,8 +7,11 @@ import {
   Post,
   Query,
   Req,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ChatService } from './chat.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -41,12 +44,26 @@ export class ChatController {
   }
 
   @Post('conversations/:conversationId/messages')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: {
+        fileSize: 50 * 1024 * 1024,
+      },
+    }),
+  )
   sendMessage(
     @Param('conversationId') conversationId: string,
     @Body() body: any,
     @Req() req: any,
+    @UploadedFile() file?: Express.Multer.File,
   ) {
-    return this.chatService.sendMessage(conversationId, body, req.user);
+    return this.chatService.sendMessage(
+      conversationId,
+      body,
+      req.user,
+      file,
+      req.headers.authorization,
+    );
   }
 
   @Patch('conversations/:conversationId/read')

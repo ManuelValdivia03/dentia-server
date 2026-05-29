@@ -1,10 +1,13 @@
 import { HttpException, Injectable } from '@nestjs/common';
 import axios, { AxiosError } from 'axios';
+import { FilesService } from '../files/files.service';
 
 @Injectable()
 export class ChatService {
   private readonly chatServiceUrl =
     process.env.CHAT_SERVICE_URL ?? 'http://localhost:3004';
+
+  constructor(private readonly filesService: FilesService) {}
 
   async listConversations(user: any) {
     return this.forward(() =>
@@ -34,11 +37,39 @@ export class ChatService {
     );
   }
 
-  async sendMessage(conversationId: string, body: any, user: any) {
+  async sendMessage(
+    conversationId: string,
+    body: any,
+    user: any,
+    file?: Express.Multer.File,
+    authorization?: string,
+  ) {
+    const payload: any = {};
+
+    if (body?.body) {
+      payload.body = body.body;
+    }
+
+    // Reuse files-service to store the binary; the chat message only carries a reference.
+    if (file) {
+      if (!authorization) {
+        throw new HttpException('Authorization header is required', 401);
+      }
+
+      const uploaded = await this.filesService.upload(file, body, authorization);
+
+      payload.attachment = {
+        fileId: uploaded.id,
+        contentType: uploaded.contentType,
+        originalName: uploaded.originalName,
+        size: uploaded.size,
+      };
+    }
+
     return this.forward(() =>
       axios.post(
         `${this.chatServiceUrl}/chat/conversations/${conversationId}/messages`,
-        body,
+        payload,
         {
           headers: this.buildUserHeaders(user),
         },
