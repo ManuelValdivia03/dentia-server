@@ -6,6 +6,7 @@ from app.schemas.reports import (
 )
 from app.security.auth import require_roles, require_internal_key, resolve_doctor_scope
 from app.services.reports_service import ReportsService
+from fastapi.responses import Response
 
 router = APIRouter(prefix="/reports", tags=["Reports"])
 
@@ -61,3 +62,28 @@ def get_appointments_by_status(
     effective_doctor_id = resolve_doctor_scope(current_user, doctor_id)
 
     return service.get_appointments_by_status(effective_doctor_id)
+
+@router.get(
+    "/export/appointments-by-status",
+    summary="Exportar citas agrupadas por estado en CSV",
+    description="Genera un archivo CSV con el total de citas por estado.",
+)
+def export_appointments_by_status(
+    doctor_id: str | None = Query(default=None, description="Filtra por dentista"),
+    current_user: dict = Depends(require_roles("admin", "dentist")),
+):
+    effective_doctor_id = resolve_doctor_scope(current_user, doctor_id)
+    csv_content = service.export_appointments_by_status_csv(effective_doctor_id)
+
+    filename = "appointments-by-status.csv"
+
+    if effective_doctor_id:
+        filename = f"appointments-by-status-{effective_doctor_id}.csv"
+
+    return Response(
+        content=csv_content,
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"'
+        },
+    )

@@ -57,6 +57,32 @@ export class ReportsService {
     }
   }
 
+  async exportAppointmentsByStatus(authorization: string, doctorId?: string) {
+    try {
+      const response = await firstValueFrom(
+        this.httpService.get(
+          `${this.reportsServiceUrl}/reports/export/appointments-by-status`,
+          {
+            headers: {
+              Authorization: authorization,
+            },
+            params: {
+              doctor_id: doctorId,
+            },
+            responseType: 'arraybuffer',
+          },
+        ),
+      );
+
+      return {
+        buffer: Buffer.from(response.data),
+        headers: response.headers,
+      };
+    } catch (error) {
+      this.handleReportsError(error);
+    }
+  }
+
   private handleReportsError(error: any): never {
     const status = error?.response?.status;
     const data = error?.response?.data;

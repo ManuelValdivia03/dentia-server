@@ -1,5 +1,7 @@
 from app.db.neo4j import neo4j_client
 from app.schemas.reports import AppointmentSnapshotRequest
+import csv
+import io
 
 
 class ReportsService:
@@ -83,3 +85,16 @@ class ReportsService:
                     for record in result
                 ]
             }
+    
+    def export_appointments_by_status_csv(self, doctor_id: str | None = None):
+        report = self.get_appointments_by_status(doctor_id)
+
+        output = io.StringIO()
+        writer = csv.writer(output)
+
+        writer.writerow(["status", "total"])
+
+        for item in report["data"]:
+            writer.writerow([item["status"], item["total"]])
+
+        return output.getvalue()
