@@ -96,7 +96,7 @@ export class AuthService implements OnModuleInit {
     }
   }
 
-  async registerPatient(dto: RegisterDto) {
+  async registerPatient(dto: RegisterDto, photo?: Express.Multer.File) {
     const existingUser = await this.usersRepository.findOne({
       where: { email: dto.email },
     });
@@ -110,6 +110,29 @@ export class AuthService implements OnModuleInit {
 
     const domainPrefix = role === UserRole.DENTIST ? 'd' : 'p';
 
+    if (role === UserRole.DENTIST) {
+      if (!dto.cedulaProfesional || !dto.escuela || !dto.descripcion) {
+        throw new BadRequestException(
+          'La cédula profesional, escuela y descripción son obligatorias para dentistas',
+        );
+      }
+
+      this.assertValidProfilePhoto(photo);
+
+      const cedulaTaken = await this.usersRepository.findOne({
+        where: {
+          role: UserRole.DENTIST,
+          cedulaProfesional: dto.cedulaProfesional,
+        },
+      });
+
+      if (cedulaTaken) {
+        throw new ConflictException(
+          'Ya existe un dentista con esa cédula profesional',
+        );
+      }
+    }
+
     const passwordHash = await bcrypt.hash(dto.password, 10);
     const verificationCode = this.generateVerificationCode();
     const verificationCodeHash = await bcrypt.hash(verificationCode, 10);
@@ -121,6 +144,13 @@ export class AuthService implements OnModuleInit {
       role,
       domainId: `${domainPrefix}-${randomUUID()}`,
       fullName: dto.fullName,
+      cedulaProfesional:
+        role === UserRole.DENTIST ? dto.cedulaProfesional : undefined,
+      escuela: role === UserRole.DENTIST ? dto.escuela : undefined,
+      descripcion: role === UserRole.DENTIST ? dto.descripcion : undefined,
+      profilePhoto: role === UserRole.DENTIST ? photo!.buffer : undefined,
+      profilePhotoContentType:
+        role === UserRole.DENTIST ? photo!.mimetype : undefined,
       isActive: true,
       emailVerified: false,
       emailVerificationCodeHash: verificationCodeHash,
@@ -311,13 +341,7 @@ export class AuthService implements OnModuleInit {
       order: { fullName: 'ASC', email: 'ASC' },
     });
 
-    return dentists.map((dentist) => ({
-      id: dentist.id,
-      domainId: dentist.domainId,
-      fullName: dentist.fullName,
-      specialty: dentist.specialty,
-      email: dentist.email,
-    }));
+    return dentists.map((dentist) => this.toDentistView(dentist));
   }
 
   async findDentistByDomainId(domainId: string) {
@@ -329,12 +353,25 @@ export class AuthService implements OnModuleInit {
       throw new NotFoundException('Dentista no encontrado');
     }
 
+    return this.toDentistView(dentist);
+  }
+
+  async getDentistPhoto(domainId: string) {
+    const dentist = await this.usersRepository
+      .createQueryBuilder('user')
+      .addSelect('user.profilePhoto')
+      .where('user.domainId = :domainId', { domainId })
+      .andWhere('user.role = :role', { role: UserRole.DENTIST })
+      .andWhere('user.isActive = :isActive', { isActive: true })
+      .getOne();
+
+    if (!dentist || !dentist.profilePhoto) {
+      throw new NotFoundException('Foto de perfil no encontrada');
+    }
+
     return {
-      id: dentist.id,
-      domainId: dentist.domainId,
-      fullName: dentist.fullName,
-      specialty: dentist.specialty,
-      email: dentist.email,
+      buffer: dentist.profilePhoto,
+      contentType: dentist.profilePhotoContentType ?? 'application/octet-stream',
     };
   }
 
@@ -351,6 +388,8 @@ export class AuthService implements OnModuleInit {
   }
 
   private toSafeUser(user: User) {
+    const isDentist = user.role === UserRole.DENTIST;
+
     return {
       id: user.id,
       email: user.email,
@@ -358,7 +397,80 @@ export class AuthService implements OnModuleInit {
       domainId: user.domainId,
       fullName: user.fullName,
       specialty: user.specialty,
+      cedulaProfesional: isDentist ? user.cedulaProfesional : undefined,
+      escuela: isDentist ? user.escuela : undefined,
+      descripcion: isDentist ? user.descripcion : undefined,
+      photoUrl: isDentist ? this.buildPhotoUrl(user) : undefined,
       emailVerified: user.emailVerified,
     };
+  }
+
+  private toDentistView(dentist: User) {
+    return {
+      id: dentist.id,
+      domainId: dentist.domainId,
+      fullName: dentist.fullName,
+      specialty: dentist.specialty,
+      cedulaProfesional: dentist.cedulaProfesional,
+      escuela: dentist.escuela,
+      descripcion: dentist.descripcion,
+      photoUrl: this.buildPhotoUrl(dentist),
+      email: dentist.email,
+    };
+  }
+
+  private buildPhotoUrl(user: User) {
+    return user.profilePhotoContentType
+      ? `/dentists/${user.domainId}/photo`
+      : null;
+  }
+
+  private assertValidProfilePhoto(photo?: Express.Multer.File) {
+    if (!photo || !photo.buffer || photo.size === 0) {
+      throw new BadRequestException('La foto de perfil es obligatoria');
+    }
+
+    const allowed = ['image/jpeg', 'image/png', 'image/webp'];
+
+    if (!allowed.includes(photo.mimetype)) {
+      throw new BadRequestException(
+        'La foto debe ser una imagen JPEG, PNG o WEBP',
+      );
+    }
+
+    if (!this.matchesImageSignature(photo.buffer, photo.mimetype)) {
+      throw new BadRequestException('La imagen no es válida');
+    }
+  }
+
+  private matchesImageSignature(buffer: Buffer, mimetype: string): boolean {
+    if (buffer.length < 12) {
+      return false;
+    }
+
+    switch (mimetype) {
+      case 'image/jpeg':
+        return (
+          buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff
+        );
+      case 'image/png':
+        return (
+          buffer[0] === 0x89 &&
+          buffer[1] === 0x50 &&
+          buffer[2] === 0x4e &&
+          buffer[3] === 0x47 &&
+          buffer[4] === 0x0d &&
+          buffer[5] === 0x0a &&
+          buffer[6] === 0x1a &&
+          buffer[7] === 0x0a
+        );
+      case 'image/webp':
+        return (
+          buffer.toString('ascii', 0, 4) === 'RIFF' &&
+          buffer.toString('ascii', 8, 12) === 'WEBP'
+        );
+      default:
+        return false;
+    }
   }
 }

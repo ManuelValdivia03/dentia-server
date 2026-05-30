@@ -1,4 +1,13 @@
-import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  HttpCode,
+  HttpStatus,
+  Post,
+  UploadedFile,
+  UseInterceptors,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
@@ -11,8 +20,14 @@ export class AuthController {
 
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
-  register(@Body() dto: RegisterDto) {
-    return this.authService.registerPatient(dto);
+  @UseInterceptors(
+    FileInterceptor('photo', { limits: { fileSize: 5 * 1024 * 1024 } }),
+  )
+  register(
+    @Body() dto: RegisterDto,
+    @UploadedFile() photo?: Express.Multer.File,
+  ) {
+    return this.authService.registerPatient(dto, photo);
   }
 
   @Post('verify-email')

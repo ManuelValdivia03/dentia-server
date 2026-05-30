@@ -33,6 +33,21 @@ export class User {
   @Column({ length: 120, nullable: true })
   specialty?: string;
 
+  @Column({ length: 60, nullable: true })
+  cedulaProfesional?: string;
+
+  @Column({ length: 160, nullable: true })
+  escuela?: string;
+
+  @Column({ type: 'text', nullable: true })
+  descripcion?: string;
+
+  @Column({ type: 'bytea', nullable: true, select: false })
+  profilePhoto?: Buffer | null;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  profilePhotoContentType?: string | null;
+
   @Column({ default: true })
   isActive!: boolean;
 
