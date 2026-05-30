@@ -1,6 +1,7 @@
 import { HttpService } from '@nestjs/axios';
 import { HttpException, Injectable } from '@nestjs/common';
-import { AxiosError, AxiosResponse } from 'axios';
+import axios, { AxiosError, AxiosResponse } from 'axios';
+import FormData from 'form-data';
 import { firstValueFrom, Observable } from 'rxjs';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
@@ -14,10 +15,71 @@ export class AuthService {
 
   constructor(private readonly httpService: HttpService) {}
 
-  register(dto: RegisterDto) {
-    return this.forwardRequest(() =>
-      this.httpService.post(`${this.authServiceBaseUrl}/auth/register`, dto),
-    );
+  async register(dto: RegisterDto, photo?: Express.Multer.File) {
+    const form = new FormData();
+
+    for (const [key, value] of Object.entries(dto)) {
+      if (value !== undefined && value !== null) {
+        form.append(key, String(value));
+      }
+    }
+
+    if (photo) {
+      form.append('photo', photo.buffer, {
+        filename: photo.originalname,
+        contentType: photo.mimetype,
+        knownLength: photo.size,
+      });
+    }
+
+    try {
+      const response = await axios.post(
+        `${this.authServiceBaseUrl}/auth/register`,
+        form,
+        {
+          headers: { ...form.getHeaders() },
+          maxBodyLength: Infinity,
+        },
+      );
+
+      return response.data;
+    } catch (error) {
+      const axiosError = error as AxiosError;
+
+      if (axiosError.response) {
+        throw new HttpException(
+          (axiosError.response.data as any) ?? 'Error en auth-service',
+          axiosError.response.status,
+        );
+      }
+
+      throw new HttpException('No se pudo conectar con auth-service', 503);
+    }
+  }
+
+  async getDentistPhoto(domainId: string) {
+    try {
+      const response = await axios.get(
+        `${this.authServiceBaseUrl}/dentists/${domainId}/photo`,
+        { responseType: 'stream' },
+      );
+
+      return {
+        stream: response.data,
+        headers: response.headers,
+      };
+    } catch (error) {
+      const axiosError = error as AxiosError;
+
+      if (axiosError.response) {
+        throw new HttpException(
+          'Foto de perfil no encontrada',
+          axiosError.response.status,
+        );
+      }
+
+      throw new HttpException('No se pudo conectar con auth-service', 503);
+    }
   }
 
   verifyEmail(dto: VerifyEmailDto) {
