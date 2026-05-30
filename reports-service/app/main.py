@@ -1,8 +1,18 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
 from app.core.config import settings
 from app.routers import health, reports
 from app.db.neo4j import neo4j_client
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    yield
+    neo4j_client.close()
+
 
 openapi_tags = [
     {
@@ -23,6 +33,7 @@ app = FastAPI(
     ),
     version=settings.app_version,
     openapi_tags=openapi_tags,
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -35,7 +46,3 @@ app.add_middleware(
 
 app.include_router(health.router)
 app.include_router(reports.router)
-
-@app.on_event("shutdown")
-def shutdown_event():
-    neo4j_client.close()
