@@ -11,6 +11,9 @@ namespace FilesService.Controllers;
 [ApiController]
 [Route("api/files")]
 [Authorize]
+[ApiExplorerSettings(GroupName = "v1")]
+[Produces("application/json")]
+[Tags("Files")]
 public class FilesController : ControllerBase
 {
     private readonly FileMetadataService _metadataService;
@@ -45,6 +48,12 @@ public class FilesController : ControllerBase
     [HttpPost("upload")]
     [Consumes("multipart/form-data")]
     [RequestSizeLimit(MaxUploadBytes)]
+    [ProducesResponseType(typeof(ClinicalFile), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status413PayloadTooLarge)]
+    [ProducesResponseType(StatusCodes.Status415UnsupportedMediaType)]
     public async Task<IActionResult> Upload([FromForm] FileUploadRequest request)
     {
         var file = request.File;
@@ -54,10 +63,10 @@ public class FilesController : ControllerBase
             return BadRequest(new { message = "Archivo requerido." });
 
         if (file.Length > MaxUploadBytes)
-            return BadRequest(new { message = "El archivo excede el tamaño máximo permitido (50MB)." });
+            return StatusCode(StatusCodes.Status413PayloadTooLarge, new { message = "El archivo excede el tamaño máximo permitido (50MB)." });
 
         if (!AllowedContentTypes.Contains(file.ContentType))
-            return BadRequest(new { message = "Tipo de archivo no permitido." });
+            return StatusCode(StatusCodes.Status415UnsupportedMediaType, new { message = "Tipo de archivo no permitido." });
 
         var subjectId = GetSubjectId();
         var domainId = GetDomainId();
@@ -112,6 +121,10 @@ public class FilesController : ControllerBase
     }
 
     [HttpGet]
+    [ProducesResponseType(typeof(IEnumerable<ClinicalFile>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> GetAll([FromQuery] string? patientId)
     {
         var role = GetRole();
@@ -145,6 +158,10 @@ public class FilesController : ControllerBase
     }
 
     [HttpGet("{id}")]
+    [ProducesResponseType(typeof(ClinicalFile), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetById(string id)
     {
         var file = await _metadataService.FindByIdAsync(id);
@@ -159,6 +176,11 @@ public class FilesController : ControllerBase
     }
 
     [HttpGet("{id}/download")]
+    [Produces("application/octet-stream")]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Download(string id)
     {
         var file = await _metadataService.FindByIdAsync(id);
@@ -178,6 +200,10 @@ public class FilesController : ControllerBase
     }
 
     [HttpDelete("{id}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Delete(string id)
     {
         var file = await _metadataService.FindByIdAsync(id);
