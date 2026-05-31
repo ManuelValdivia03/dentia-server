@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { FindOptionsWhere, Repository } from 'typeorm';
 import { Prescription } from './entities/prescription.entity';
 import { CreatePrescriptionDto } from './dto/create-prescription.dto';
 import { PrescriptionStatus } from './enums/prescription-status.enum';
@@ -56,6 +56,33 @@ export class PrescriptionsService {
     });
 
     return this.prescriptionsRepository.save(prescription);
+  }
+
+  async findAll(requester: RequestUser) {
+    const where: FindOptionsWhere<Prescription> = {
+      status: PrescriptionStatus.ACTIVE,
+    };
+
+    if (requester.role === RequestUserRole.PATIENT) {
+      where.patientId = requester.domainId;
+    }
+
+    if (requester.role === RequestUserRole.DENTIST) {
+      where.dentistId = requester.domainId;
+    }
+
+    if (
+      requester.role !== RequestUserRole.ADMIN &&
+      requester.role !== RequestUserRole.PATIENT &&
+      requester.role !== RequestUserRole.DENTIST
+    ) {
+      throw new ForbiddenException('No tienes permisos para ver recetas');
+    }
+
+    return this.prescriptionsRepository.find({
+      where,
+      order: { createdAt: 'DESC' },
+    });
   }
 
   async findOne(id: string, requester: RequestUser) {

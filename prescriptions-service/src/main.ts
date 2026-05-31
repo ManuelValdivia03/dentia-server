@@ -2,6 +2,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { AppModule } from './app.module';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -28,6 +29,21 @@ async function bootstrap() {
     },
     { inheritAppConfig: true },
   );
+
+  const swaggerConfig = new DocumentBuilder()
+  .setTitle('Dentia Prescriptions Service')
+  .setDescription('REST API para recetas, diagnósticos, notas clínicas y generación de PDF.')
+  .setVersion('1.0')
+  .addBearerAuth()
+  .build();
+
+  const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);
+
+  SwaggerModule.setup('docs', app, swaggerDocument, {
+    swaggerOptions: {
+      persistAuthorization: true,
+    },
+  });
 
   await app.startAllMicroservices();
   await app.listen(httpPort);

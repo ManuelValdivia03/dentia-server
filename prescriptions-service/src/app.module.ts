@@ -5,6 +5,7 @@ import { AppController } from './app.controller';
 
 @Module({
   imports: [
+    PrescriptionsModule,
     TypeOrmModule.forRoot({
       type: 'postgres',
       host: process.env.DB_HOST ?? 'localhost',
@@ -15,7 +16,6 @@ import { AppController } from './app.controller';
       autoLoadEntities: true,
       synchronize: true,
     }),
-    PrescriptionsModule,
   ],
   controllers: [AppController],
 })
