@@ -8,9 +8,9 @@ async function bootstrap() {
 
   app.enableCors({
     origin: [
-       'https://dentia-app.me',
-       'https://www.dentia-app.me',
-       'http://localhost:5173',
+      'https://dentia-app.me',
+      'https://www.dentia-app.me',
+      'http://localhost:5173',
     ],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
@@ -28,8 +28,16 @@ async function bootstrap() {
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Dentia API Gateway')
     .setDescription('Entrada principal REST para los servicios de Dentia')
-    .setVersion('1.0.0')
-    .addBearerAuth()
+    .setVersion('1.0')
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        description: 'Ingresa el JWT sin escribir Bearer manualmente.',
+      },
+      'JWT',
+    )
     .build();
 
   const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);

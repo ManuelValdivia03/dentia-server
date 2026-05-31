@@ -10,13 +10,16 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import {
+  ApiBadRequestResponse,
   ApiBearerAuth,
+  ApiBody,
   ApiCreatedResponse,
   ApiForbiddenResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
   ApiParam,
+  ApiProduces,
   ApiServiceUnavailableResponse,
   ApiTags,
   ApiUnauthorizedResponse,
@@ -44,7 +47,9 @@ export class PrescriptionsController {
   @Post('prescriptions')
   @Roles(UserRole.ADMIN, UserRole.DENTIST)
   @ApiOperation({ summary: 'Crear receta asociada a una cita' })
+  @ApiBody({ type: CreatePrescriptionDto })
   @ApiCreatedResponse({ description: 'Receta creada correctamente.' })
+  @ApiBadRequestResponse({ description: 'Datos inválidos.' })
   @ApiForbiddenResponse({ description: 'Solo administrador o dentista pueden crear recetas.' })
   @ApiUnauthorizedResponse({ description: 'JWT ausente o inválido.' })
   @ApiServiceUnavailableResponse({ description: 'prescriptions-service no disponible.' })
@@ -60,7 +65,7 @@ export class PrescriptionsController {
   @ApiOperation({ summary: 'Consultar receta por ID' })
   @ApiParam({
     name: 'id',
-    example: 'prescription-id',
+    example: 'prescription_123',
     description: 'ID de la receta.',
   })
   @ApiOkResponse({ description: 'Detalle de receta.' })
@@ -75,6 +80,14 @@ export class PrescriptionsController {
   @Get('prescriptions/:id/pdf')
   @Roles(UserRole.ADMIN, UserRole.DENTIST, UserRole.PATIENT)
   @Header('Content-Type', 'application/pdf')
+  @ApiOperation({ summary: 'Generar PDF de receta' })
+  @ApiParam({ name: 'id', example: 'prescription_123' })
+  @ApiProduces('application/pdf')
+  @ApiOkResponse({ description: 'PDF de receta generado correctamente.' })
+  @ApiNotFoundResponse({ description: 'Receta no encontrada.' })
+  @ApiForbiddenResponse({ description: 'No tiene permiso para descargar esta receta.' })
+  @ApiUnauthorizedResponse({ description: 'JWT ausente o inválido.' })
+  @ApiServiceUnavailableResponse({ description: 'prescriptions-service no disponible.' })
   async generatePdf(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
     const result = await this.prescriptionsService.generatePdf(id, req.user);
 
@@ -89,10 +102,9 @@ export class PrescriptionsController {
   @ApiOperation({ summary: 'Listar recetas asociadas a una cita' })
   @ApiParam({
     name: 'appointmentId',
-    example: 'appointment-id',
+    example: 'appointment_123',
     description: 'ID de la cita.',
   })
-
   @ApiOkResponse({ description: 'Listado de recetas asociadas a la cita.' })
   @ApiNotFoundResponse({ description: 'Cita o recetas no encontradas.' })
   @ApiForbiddenResponse({ description: 'No tiene permiso para consultar recetas de esta cita.' })

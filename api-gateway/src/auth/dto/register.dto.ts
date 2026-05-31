@@ -9,15 +9,26 @@ import {
   MinLength,
   ValidateIf,
 } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 const trim = ({ value }: { value: unknown }) =>
   typeof value === 'string' ? value.trim() : value;
 
 export class RegisterDto {
+  @ApiProperty({
+    example: 'paciente@test.com',
+    description: 'Correo electrónico del usuario.',
+  })
   @IsEmail()
   @Transform(trim)
   email!: string;
 
+  @ApiProperty({
+    example: 'Password123!',
+    description:
+      'Contraseña con mínimo 8 caracteres, una mayúscula, una minúscula y un número.',
+    minLength: 8,
+  })
   @IsString()
   @MinLength(8)
   @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$/, {
@@ -26,6 +37,12 @@ export class RegisterDto {
   })
   password!: string;
 
+  @ApiProperty({
+    example: 'Juan Pérez',
+    description: 'Nombre completo del usuario.',
+    minLength: 3,
+    maxLength: 120,
+  })
   @IsString()
   @MinLength(3)
   @MaxLength(120)
@@ -35,13 +52,22 @@ export class RegisterDto {
   @Transform(trim)
   fullName!: string;
 
+  @ApiPropertyOptional({
+    example: 'PATIENT',
+    enum: ['PATIENT', 'DENTIST'],
+    description:
+      'Rol de registro. Solo se permite PATIENT o DENTIST desde registro público.',
+  })
   @IsOptional()
   @IsIn(['PATIENT', 'DENTIST'], {
     message: 'El rol de registro solo puede ser PATIENT o DENTIST',
   })
   role?: 'PATIENT' | 'DENTIST';
 
-  // Campos obligatorios solo para dentistas.
+  @ApiPropertyOptional({
+    example: '12345678',
+    description: 'Cédula profesional. Obligatoria solo si role es DENTIST.',
+  })
   @ValidateIf((o: RegisterDto) => o.role === 'DENTIST')
   @IsString()
   @Matches(/^\d{7,8}$/, {
@@ -50,6 +76,12 @@ export class RegisterDto {
   @Transform(trim)
   cedulaProfesional?: string;
 
+  @ApiPropertyOptional({
+    example: 'Universidad Nacional Autónoma de México',
+    description: 'Escuela de egreso. Obligatoria solo si role es DENTIST.',
+    minLength: 3,
+    maxLength: 160,
+  })
   @ValidateIf((o: RegisterDto) => o.role === 'DENTIST')
   @IsString()
   @MinLength(3)
@@ -60,6 +92,13 @@ export class RegisterDto {
   @Transform(trim)
   escuela?: string;
 
+  @ApiPropertyOptional({
+    example:
+      'Cirujano dentista con experiencia en odontología general y atención preventiva.',
+    description: 'Descripción profesional. Obligatoria solo si role es DENTIST.',
+    minLength: 10,
+    maxLength: 1000,
+  })
   @ValidateIf((o: RegisterDto) => o.role === 'DENTIST')
   @IsString()
   @MinLength(10)

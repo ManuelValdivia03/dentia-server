@@ -10,10 +10,15 @@ import {
 import type { Response } from 'express';
 import {
   ApiBearerAuth,
+  ApiForbiddenResponse,
+  ApiOkResponse,
   ApiOperation,
+  ApiProduces,
   ApiQuery,
   ApiResponse,
+  ApiServiceUnavailableResponse,
   ApiTags,
+  ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 
 import { ReportsService } from './reports.service';
@@ -21,7 +26,7 @@ import { DashboardSummaryResponseDto } from './dto/dashboard-summary-response.dt
 import { AppointmentStatusReportResponseDto } from './dto/appointment-status-report-response.dto';
 
 @ApiTags('Reports')
-@ApiBearerAuth()
+@ApiBearerAuth('JWT')
 @Controller('reports')
 export class ReportsController {
   constructor(private readonly reportsService: ReportsService) {}
@@ -42,14 +47,9 @@ export class ReportsController {
     description: 'Resumen obtenido correctamente.',
     type: DashboardSummaryResponseDto,
   })
-  @ApiResponse({
-    status: 401,
-    description: 'Token ausente o inválido.',
-  })
-  @ApiResponse({
-    status: 403,
-    description: 'Rol sin permisos suficientes.',
-  })
+  @ApiUnauthorizedResponse({ description: 'Token ausente o inválido.' })
+  @ApiForbiddenResponse({ description: 'Rol sin permisos suficientes.' })
+  @ApiServiceUnavailableResponse({ description: 'reports-service no disponible.' })
   getDashboardSummary(
     @Headers('authorization') authorization: string,
     @Query('doctor_id') doctorId?: string,
@@ -77,14 +77,9 @@ export class ReportsController {
     description: 'Reporte obtenido correctamente.',
     type: AppointmentStatusReportResponseDto,
   })
-  @ApiResponse({
-    status: 401,
-    description: 'Token ausente o inválido.',
-  })
-  @ApiResponse({
-    status: 403,
-    description: 'Rol sin permisos suficientes.',
-  })
+  @ApiUnauthorizedResponse({ description: 'Token ausente o inválido.' })
+  @ApiForbiddenResponse({ description: 'Rol sin permisos suficientes.' })
+  @ApiServiceUnavailableResponse({ description: 'reports-service no disponible.' })
   getAppointmentsByStatus(
     @Headers('authorization') authorization: string,
     @Query('doctor_id') doctorId?: string,
@@ -107,6 +102,11 @@ export class ReportsController {
     required: false,
     description: 'Filtra la exportación por dentista.',
   })
+  @ApiProduces('text/csv')
+  @ApiOkResponse({ description: 'CSV generado correctamente.' })
+  @ApiUnauthorizedResponse({ description: 'Token ausente o inválido.' })
+  @ApiForbiddenResponse({ description: 'Rol sin permisos suficientes.' })
+  @ApiServiceUnavailableResponse({ description: 'reports-service no disponible.' })
   async exportAppointmentsByStatus(
     @Headers('authorization') authorization: string,
     @Query('doctor_id') doctorId: string | undefined,
