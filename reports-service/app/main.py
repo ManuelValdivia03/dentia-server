@@ -31,10 +31,12 @@ app = FastAPI(
         "Servicio analítico de Dentia para reportes, gráficas e indicadores. "
         "Expone endpoints REST documentados con Swagger/OpenAPI."
     ),
-    version=settings.app_version,
+    version="1.0",
     openapi_tags=openapi_tags,
     lifespan=lifespan,
 )
+
+app.openapi_version = "3.0.3"
 
 app.add_middleware(
     CORSMiddleware,

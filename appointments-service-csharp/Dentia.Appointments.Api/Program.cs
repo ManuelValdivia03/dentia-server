@@ -13,7 +13,6 @@ using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Database
 var dbHost = builder.Configuration["DB_HOST"] ?? "localhost";
 var dbPort = builder.Configuration["DB_PORT"] ?? "5432";
 var dbUser = builder.Configuration["DB_USER"] ?? "dentia";
@@ -33,7 +32,6 @@ builder.Services.AddDbContext<AppointmentsDbContext>(options =>
     options.UseNpgsql(dataSource);
 });
 
-// Controllers / JSON
 builder.Services
     .AddControllers()
     .AddJsonOptions(options =>
@@ -41,17 +39,23 @@ builder.Services
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
     });
 
-// Application services
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 builder.Services.AddScoped<IAppointmentsService, AppointmentsService>();
 builder.Services.AddScoped<IRatingsService, RatingsService>();
 builder.Services.AddScoped<IAppointmentEventsPublisher, AppointmentEventsPublisher>();
 builder.Services.AddHttpClient<IReportsClient, ReportsClient>();
-// Swagger
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
+    options.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
+    {
+        Title = "Dentia Appointments Service",
+        Version = "1.0",
+        Description = "REST API para agenda, citas, disponibilidad y valoraciones."
+    });
+
     options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         Name = "Authorization",
@@ -78,7 +82,6 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 
-// Auth
 builder.Services
     .AddAuthentication(DentiaJwtAuthenticationHandler.SchemeName)
     .AddScheme<AuthenticationSchemeOptions, DentiaJwtAuthenticationHandler>(
