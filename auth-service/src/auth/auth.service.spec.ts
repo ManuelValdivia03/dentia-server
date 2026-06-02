@@ -5,7 +5,11 @@ jest.mock('bcrypt', () => ({
   compare: jest.fn(),
 }));
 
-import { ConflictException, UnauthorizedException } from '@nestjs/common';
+import {
+  ConflictException,
+  HttpException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { AuthService } from './auth.service';
@@ -32,6 +36,7 @@ describe('AuthService', () => {
       create: jest.fn(),
       save: jest.fn(),
       findOne: jest.fn(),
+      update: jest.fn(),
     };
 
     jwtService = {
@@ -40,6 +45,7 @@ describe('AuthService', () => {
 
     mailService = {
       sendVerificationCode: jest.fn(),
+      sendPasswordResetCode: jest.fn(),
     } as any;
 
     service = new AuthService(
@@ -263,8 +269,7 @@ describe('AuthService', () => {
     };
     const photo = {
       buffer: Buffer.from([
-        0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00,
-        0x00,
+        0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x00,
       ]),
       mimetype: 'image/png',
       size: 12,
@@ -292,7 +297,7 @@ describe('AuthService', () => {
     );
   });
 
-    it('registerPatient debe crear dentista no verificado si role es DENTIST', async () => {
+  it('registerPatient debe crear dentista no verificado si role es DENTIST', async () => {
     const dto = {
       email: 'dentista@dentia.local',
       password: 'Password123*',
@@ -304,8 +309,7 @@ describe('AuthService', () => {
     };
     const photo = {
       buffer: Buffer.from([
-        0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00,
-        0x00,
+        0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x00,
       ]),
       mimetype: 'image/png',
       size: 12,
@@ -452,6 +456,36 @@ describe('AuthService', () => {
     ).rejects.toThrow(UnauthorizedException);
   });
 
+  it('login debe bloquear temporalmente tras demasiados intentos fallidos', async () => {
+    const user = {
+      id: 'u1',
+      email: 'patient1@dentia.local',
+      passwordHash: 'hash-real',
+      role: UserRole.PATIENT,
+      domainId: 'p1',
+      isActive: true,
+      emailVerified: true,
+      failedLoginAttempts: 4,
+      loginLockedUntil: null,
+    };
+
+    usersRepository.findOne.mockResolvedValueOnce(user);
+    usersRepository.save.mockImplementation(
+      async (savedUser: any) => savedUser,
+    );
+    (bcrypt.compare as jest.Mock).mockResolvedValueOnce(false);
+
+    await expect(
+      service.login({
+        email: 'patient1@dentia.local',
+        password: 'incorrecta123',
+      }),
+    ).rejects.toThrow(HttpException);
+
+    expect(user.failedLoginAttempts).toBe(5);
+    expect(user.loginLockedUntil).toBeInstanceOf(Date);
+  });
+
   it('login debe fallar si el correo no está verificado', async () => {
     usersRepository.findOne.mockResolvedValueOnce({
       id: 'u1',
@@ -489,7 +523,9 @@ describe('AuthService', () => {
     };
 
     usersRepository.findOne.mockResolvedValueOnce(user);
-    usersRepository.save.mockImplementation(async (savedUser: any) => savedUser);
+    usersRepository.save.mockImplementation(
+      async (savedUser: any) => savedUser,
+    );
     (bcrypt.compare as jest.Mock).mockResolvedValueOnce(false);
 
     await expect(
@@ -501,6 +537,37 @@ describe('AuthService', () => {
 
     expect(user.emailVerificationAttempts).toBe(1);
     expect(usersRepository.save).toHaveBeenCalledWith(user);
+  });
+
+  it('verifyEmail debe bloquear temporalmente al llegar al maximo de intentos', async () => {
+    const user = {
+      id: 'u1',
+      email: 'nuevo@dentia.local',
+      role: UserRole.PATIENT,
+      domainId: 'p1',
+      isActive: true,
+      emailVerified: false,
+      emailVerificationCodeHash: 'hash-code',
+      emailVerificationExpiresAt: new Date(Date.now() + 10 * 60 * 1000),
+      emailVerificationAttempts: 4,
+      emailVerificationLockedUntil: null,
+    };
+
+    usersRepository.findOne.mockResolvedValueOnce(user);
+    usersRepository.save.mockImplementation(
+      async (savedUser: any) => savedUser,
+    );
+    (bcrypt.compare as jest.Mock).mockResolvedValueOnce(false);
+
+    await expect(
+      service.verifyEmail({
+        email: 'nuevo@dentia.local',
+        code: '000000',
+      }),
+    ).rejects.toThrow(HttpException);
+
+    expect(user.emailVerificationAttempts).toBe(5);
+    expect(user.emailVerificationLockedUntil).toBeInstanceOf(Date);
   });
 
   it('verifyEmail debe marcar el correo como verificado si el código es correcto', async () => {
@@ -520,7 +587,9 @@ describe('AuthService', () => {
     };
 
     usersRepository.findOne.mockResolvedValueOnce(user);
-    usersRepository.save.mockImplementation(async (savedUser: any) => savedUser);
+    usersRepository.save.mockImplementation(
+      async (savedUser: any) => savedUser,
+    );
     (bcrypt.compare as jest.Mock).mockResolvedValueOnce(true);
 
     const result = await service.verifyEmail({
@@ -563,7 +632,9 @@ describe('AuthService', () => {
     };
 
     usersRepository.findOne.mockResolvedValueOnce(user);
-    usersRepository.save.mockImplementation(async (savedUser: any) => savedUser);
+    usersRepository.save.mockImplementation(
+      async (savedUser: any) => savedUser,
+    );
 
     (bcrypt.hash as jest.Mock).mockImplementation(
       async (value: string) => `hash-${value}`,
@@ -587,6 +658,98 @@ describe('AuthService', () => {
 
     expect(result).toEqual({
       message: 'Código de verificación reenviado',
+    });
+  });
+
+  it('requestPasswordReset debe generar codigo y enviarlo si la cuenta esta verificada', async () => {
+    const user = {
+      id: 'u1',
+      email: 'patient1@dentia.local',
+      role: UserRole.PATIENT,
+      domainId: 'p1',
+      isActive: true,
+      emailVerified: true,
+      passwordResetCodeHash: null,
+      passwordResetExpiresAt: null,
+      passwordResetAttempts: 0,
+      passwordResetLastSentAt: null,
+      passwordResetLockedUntil: null,
+    };
+
+    usersRepository.findOne.mockResolvedValueOnce(user);
+    usersRepository.save.mockImplementation(
+      async (savedUser: any) => savedUser,
+    );
+    (bcrypt.hash as jest.Mock).mockImplementation(
+      async (value: string) => `hash-${value}`,
+    );
+
+    const result = await service.requestPasswordReset({
+      email: 'patient1@dentia.local',
+    });
+
+    expect(user.passwordResetCodeHash).toEqual(
+      expect.stringMatching(/^hash-\d{6}$/),
+    );
+    expect(user.passwordResetExpiresAt).toBeInstanceOf(Date);
+    expect(user.passwordResetAttempts).toBe(0);
+    expect(user.passwordResetLastSentAt).toBeInstanceOf(Date);
+    expect(mailService.sendPasswordResetCode).toHaveBeenCalledWith(
+      user.email,
+      expect.stringMatching(/^\d{6}$/),
+    );
+    expect(result).toEqual({
+      message:
+        'Si el correo existe y esta verificado, enviaremos un codigo de recuperacion.',
+    });
+  });
+
+  it('resetPassword debe actualizar contrasena e invalidar sesiones activas', async () => {
+    const user = {
+      id: 'u1',
+      email: 'patient1@dentia.local',
+      passwordHash: 'old-hash',
+      role: UserRole.PATIENT,
+      domainId: 'p1',
+      isActive: true,
+      emailVerified: true,
+      passwordResetCodeHash: 'reset-hash',
+      passwordResetExpiresAt: new Date(Date.now() + 10 * 60 * 1000),
+      passwordResetAttempts: 1,
+      passwordResetLastSentAt: new Date(),
+      passwordResetLockedUntil: null,
+      failedLoginAttempts: 2,
+      loginLockedUntil: new Date(Date.now() + 10 * 60 * 1000),
+    };
+
+    usersRepository.findOne.mockResolvedValueOnce(user);
+    usersRepository.save.mockImplementation(
+      async (savedUser: any) => savedUser,
+    );
+    refreshSessionsRepository.update.mockResolvedValueOnce({ affected: 2 });
+    (bcrypt.compare as jest.Mock).mockResolvedValueOnce(true);
+    (bcrypt.hash as jest.Mock).mockResolvedValueOnce('hash-NewPassword123');
+
+    const result = await service.resetPassword({
+      email: 'patient1@dentia.local',
+      code: '123456',
+      password: 'NewPassword123',
+    });
+
+    expect(user.passwordHash).toBe('hash-NewPassword123');
+    expect(user.passwordResetCodeHash).toBeNull();
+    expect(user.passwordResetExpiresAt).toBeNull();
+    expect(user.passwordResetAttempts).toBe(0);
+    expect(user.passwordResetLastSentAt).toBeNull();
+    expect(user.passwordResetLockedUntil).toBeNull();
+    expect(user.failedLoginAttempts).toBe(0);
+    expect(user.loginLockedUntil).toBeNull();
+    expect(refreshSessionsRepository.update).toHaveBeenCalledWith(
+      { userId: user.id, revokedAt: expect.anything() },
+      { revokedAt: expect.any(Date) },
+    );
+    expect(result).toEqual({
+      message: 'Contrasena actualizada correctamente',
     });
   });
 });

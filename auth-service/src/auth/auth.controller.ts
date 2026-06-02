@@ -7,6 +7,7 @@ import {
   Req,
   Res,
   UploadedFile,
+  UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
@@ -28,6 +29,10 @@ import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
 import { ResendVerificationCodeDto } from './dto/resend-verification-code.dto';
+import { RequestPasswordResetDto } from './dto/request-password-reset.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
+import { RateLimit } from './rate-limit.decorator';
+import { RateLimitGuard } from './rate-limit.guard';
 
 function getEnvNumber(name: string, fallback: number) {
   const value = process.env[name];
@@ -45,6 +50,13 @@ export class AuthController {
 
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
+  @UseGuards(RateLimitGuard)
+  @RateLimit({
+    name: 'auth-register',
+    limit: getEnvNumber('AUTH_REGISTER_RATE_LIMIT_MAX', 3),
+    windowMs:
+      getEnvNumber('AUTH_REGISTER_RATE_LIMIT_WINDOW_SECONDS', 600) * 1000,
+  })
   @UseInterceptors(
     FileInterceptor('photo', { limits: { fileSize: 5 * 1024 * 1024 } }),
   )
@@ -108,6 +120,7 @@ export class AuthController {
   @ApiConflictResponse({
     description: 'El correo ya esta registrado y verificado.',
   })
+  @ApiResponse({ status: 429, description: 'Demasiadas solicitudes.' })
   @ApiResponse({ status: 415, description: 'Archivo no soportado.' })
   register(
     @Body() dto: RegisterDto,
@@ -118,26 +131,97 @@ export class AuthController {
 
   @Post('verify-email')
   @HttpCode(HttpStatus.OK)
+  @UseGuards(RateLimitGuard)
+  @RateLimit({
+    name: 'auth-verify-email',
+    limit: getEnvNumber('AUTH_VERIFY_EMAIL_RATE_LIMIT_MAX', 5),
+    windowMs:
+      getEnvNumber('AUTH_VERIFY_EMAIL_RATE_LIMIT_WINDOW_SECONDS', 600) * 1000,
+  })
   @ApiOperation({ summary: 'Verificar correo electronico' })
   @ApiBody({ type: VerifyEmailDto })
   @ApiOkResponse({ description: 'Correo verificado correctamente' })
   @ApiBadRequestResponse({ description: 'Codigo invalido o datos incorrectos' })
+  @ApiResponse({
+    status: 429,
+    description: 'Demasiadas solicitudes o intentos.',
+  })
   verifyEmail(@Body() dto: VerifyEmailDto) {
     return this.authService.verifyEmail(dto);
   }
 
   @Post('resend-verification-code')
   @HttpCode(HttpStatus.OK)
+  @UseGuards(RateLimitGuard)
+  @RateLimit({
+    name: 'auth-resend-verification-code',
+    limit: getEnvNumber('AUTH_RESEND_VERIFICATION_RATE_LIMIT_MAX', 3),
+    windowMs:
+      getEnvNumber('AUTH_RESEND_VERIFICATION_RATE_LIMIT_WINDOW_SECONDS', 600) *
+      1000,
+  })
   @ApiOperation({ summary: 'Reenviar codigo de verificacion' })
   @ApiBody({ type: ResendVerificationCodeDto })
   @ApiOkResponse({ description: 'Codigo reenviado correctamente' })
   @ApiBadRequestResponse({ description: 'Correo invalido' })
+  @ApiResponse({ status: 429, description: 'Demasiadas solicitudes.' })
   resendVerificationCode(@Body() dto: ResendVerificationCodeDto) {
     return this.authService.resendVerificationCode(dto);
   }
 
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(RateLimitGuard)
+  @RateLimit({
+    name: 'auth-forgot-password',
+    limit: getEnvNumber('AUTH_REQUEST_PASSWORD_RESET_RATE_LIMIT_MAX', 3),
+    windowMs:
+      getEnvNumber(
+        'AUTH_REQUEST_PASSWORD_RESET_RATE_LIMIT_WINDOW_SECONDS',
+        600,
+      ) * 1000,
+  })
+  @ApiOperation({ summary: 'Solicitar codigo para recuperar contrasena' })
+  @ApiBody({ type: RequestPasswordResetDto })
+  @ApiOkResponse({ description: 'Solicitud procesada correctamente' })
+  @ApiBadRequestResponse({
+    description: 'Solicitud reciente o datos invalidos',
+  })
+  @ApiResponse({ status: 429, description: 'Demasiadas solicitudes.' })
+  requestPasswordReset(@Body() dto: RequestPasswordResetDto) {
+    return this.authService.requestPasswordReset(dto);
+  }
+
+  @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(RateLimitGuard)
+  @RateLimit({
+    name: 'auth-reset-password',
+    limit: getEnvNumber('AUTH_RESET_PASSWORD_RATE_LIMIT_MAX', 5),
+    windowMs:
+      getEnvNumber('AUTH_RESET_PASSWORD_RATE_LIMIT_WINDOW_SECONDS', 600) * 1000,
+  })
+  @ApiOperation({ summary: 'Cambiar contrasena usando codigo de recuperacion' })
+  @ApiBody({ type: ResetPasswordDto })
+  @ApiOkResponse({ description: 'Contrasena actualizada correctamente' })
+  @ApiBadRequestResponse({ description: 'Codigo expirado o datos invalidos' })
+  @ApiUnauthorizedResponse({ description: 'Codigo de recuperacion invalido' })
+  @ApiResponse({
+    status: 429,
+    description: 'Demasiadas solicitudes o intentos.',
+  })
+  resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.authService.resetPassword(dto);
+  }
+
   @Post('login')
   @HttpCode(HttpStatus.OK)
+  @UseGuards(RateLimitGuard)
+  @RateLimit({
+    name: 'auth-login',
+    limit: getEnvNumber('AUTH_LOGIN_RATE_LIMIT_MAX', 5),
+    windowMs: getEnvNumber('AUTH_LOGIN_RATE_LIMIT_WINDOW_SECONDS', 60) * 1000,
+  })
   @ApiOperation({ summary: 'Iniciar sesion' })
   @ApiBody({ type: LoginDto })
   @ApiOkResponse({ description: 'Login exitoso' })
@@ -146,7 +230,14 @@ export class AuthController {
       'Credenciales invalidas o correo pendiente de verificacion. Si requiere verificacion, la respuesta incluye requiresEmailVerification y email.',
   })
   @ApiBadRequestResponse({ description: 'Datos invalidos' })
-  async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
+  @ApiResponse({
+    status: 429,
+    description: 'Demasiadas solicitudes o intentos fallidos.',
+  })
+  async login(
+    @Body() dto: LoginDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
     const result = await this.authService.login(dto);
 
     this.setRefreshCookie(res, result.refreshToken);
@@ -182,10 +273,7 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Cerrar sesion' })
   @ApiOkResponse({ description: 'Sesion cerrada correctamente' })
-  async logout(
-    @Req() req: Request,
-    @Res({ passthrough: true }) res: Response,
-  ) {
+  async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const result = await this.authService.logout(
       this.getRefreshTokenFromRequest(req),
     );

@@ -4,6 +4,7 @@ import {
   HttpException,
   HttpStatus,
   Injectable,
+  Logger,
   NotFoundException,
   OnModuleInit,
   UnauthorizedException,
@@ -17,6 +18,8 @@ import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
 import { ResendVerificationCodeDto } from './dto/resend-verification-code.dto';
+import { RequestPasswordResetDto } from './dto/request-password-reset.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 import { User } from '../users/entities/user.entity';
 import { UserRole } from '../users/enums/user-role.enum';
 import { MailService } from '../mail/mail.service';
@@ -31,6 +34,8 @@ function getEnvNumber(name: string, fallback: number) {
 
 @Injectable()
 export class AuthService implements OnModuleInit {
+  private readonly logger = new Logger(AuthService.name);
+
   private readonly verificationTtlMinutes = Number(
     process.env.EMAIL_VERIFICATION_TTL_MINUTES ?? 10,
   );
@@ -42,6 +47,35 @@ export class AuthService implements OnModuleInit {
   private readonly maxVerificationAttempts = Number(
     process.env.EMAIL_VERIFICATION_MAX_ATTEMPTS ?? 5,
   );
+
+  private readonly emailVerificationLockoutMs =
+    getEnvNumber('EMAIL_VERIFICATION_LOCKOUT_SECONDS', 900) * 1000;
+
+  private readonly maxFailedLoginAttempts = getEnvNumber(
+    'AUTH_MAX_FAILED_LOGIN_ATTEMPTS',
+    5,
+  );
+
+  private readonly loginLockoutMs =
+    getEnvNumber('AUTH_LOGIN_LOCKOUT_SECONDS', 900) * 1000;
+
+  private readonly passwordResetTtlMinutes = getEnvNumber(
+    'PASSWORD_RESET_TTL_MINUTES',
+    10,
+  );
+
+  private readonly passwordResetCooldownSeconds = getEnvNumber(
+    'PASSWORD_RESET_RESEND_COOLDOWN_SECONDS',
+    60,
+  );
+
+  private readonly maxPasswordResetAttempts = getEnvNumber(
+    'PASSWORD_RESET_MAX_ATTEMPTS',
+    5,
+  );
+
+  private readonly passwordResetLockoutMs =
+    getEnvNumber('PASSWORD_RESET_LOCKOUT_SECONDS', 900) * 1000;
 
   private readonly accessTokenTtl = process.env.ACCESS_TOKEN_TTL || '2m';
 
@@ -108,6 +142,14 @@ export class AuthService implements OnModuleInit {
         emailVerificationExpiresAt: null,
         emailVerificationAttempts: 0,
         emailVerificationLastSentAt: null,
+        emailVerificationLockedUntil: null,
+        failedLoginAttempts: 0,
+        loginLockedUntil: null,
+        passwordResetCodeHash: null,
+        passwordResetExpiresAt: null,
+        passwordResetAttempts: 0,
+        passwordResetLastSentAt: null,
+        passwordResetLockedUntil: null,
       });
 
       await this.usersRepository.save(user);
@@ -178,6 +220,14 @@ export class AuthService implements OnModuleInit {
       emailVerificationExpiresAt: expiresAt,
       emailVerificationAttempts: 0,
       emailVerificationLastSentAt: new Date(),
+      emailVerificationLockedUntil: null,
+      failedLoginAttempts: 0,
+      loginLockedUntil: null,
+      passwordResetCodeHash: null,
+      passwordResetExpiresAt: null,
+      passwordResetAttempts: 0,
+      passwordResetLastSentAt: null,
+      passwordResetLockedUntil: null,
     });
 
     const savedUser = await this.usersRepository.save(user);
@@ -188,8 +238,7 @@ export class AuthService implements OnModuleInit {
     );
 
     return {
-      message:
-        'Registro iniciado. Revisa tu correo para verificar tu cuenta.',
+      message: 'Registro iniciado. Revisa tu correo para verificar tu cuenta.',
       user: this.toSafeUser(savedUser),
     };
   }
@@ -210,16 +259,24 @@ export class AuthService implements OnModuleInit {
       };
     }
 
-    if (
-      !user.emailVerificationCodeHash ||
-      !user.emailVerificationExpiresAt
-    ) {
-      throw new BadRequestException(
-        'No hay un código de verificación activo',
+    if (!user.emailVerificationCodeHash || !user.emailVerificationExpiresAt) {
+      throw new BadRequestException('No hay un código de verificación activo');
+    }
+
+    if (this.isLocked(user.emailVerificationLockedUntil)) {
+      this.logger.warn(`email verification blocked email=${user.email}`);
+      throw new HttpException(
+        'Demasiados intentos. Solicita un nuevo codigo mas tarde',
+        HttpStatus.TOO_MANY_REQUESTS,
       );
     }
 
     if (user.emailVerificationAttempts >= this.maxVerificationAttempts) {
+      user.emailVerificationLockedUntil = this.getLockoutExpirationDate(
+        this.emailVerificationLockoutMs,
+      );
+      await this.usersRepository.save(user);
+
       throw new HttpException(
         'Demasiados intentos. Solicita un nuevo código',
         HttpStatus.TOO_MANY_REQUESTS,
@@ -237,6 +294,22 @@ export class AuthService implements OnModuleInit {
 
     if (!codeMatches) {
       user.emailVerificationAttempts += 1;
+
+      if (user.emailVerificationAttempts >= this.maxVerificationAttempts) {
+        user.emailVerificationLockedUntil = this.getLockoutExpirationDate(
+          this.emailVerificationLockoutMs,
+        );
+        await this.usersRepository.save(user);
+        this.logger.warn(
+          `email verification locked email=${user.email} attempts=${user.emailVerificationAttempts}`,
+        );
+
+        throw new HttpException(
+          'Demasiados intentos. Solicita un nuevo codigo mas tarde',
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+      }
+
       await this.usersRepository.save(user);
 
       throw new UnauthorizedException('Código de verificación inválido');
@@ -247,8 +320,10 @@ export class AuthService implements OnModuleInit {
     user.emailVerificationExpiresAt = null;
     user.emailVerificationAttempts = 0;
     user.emailVerificationLastSentAt = null;
+    user.emailVerificationLockedUntil = null;
 
     const savedUser = await this.usersRepository.save(user);
+    this.logger.log(`email verified userId=${savedUser.id}`);
 
     return {
       message: 'Correo verificado correctamente',
@@ -285,13 +360,11 @@ export class AuthService implements OnModuleInit {
 
     const verificationCode = this.generateVerificationCode();
 
-    user.emailVerificationCodeHash = await bcrypt.hash(
-      verificationCode,
-      10,
-    );
+    user.emailVerificationCodeHash = await bcrypt.hash(verificationCode, 10);
     user.emailVerificationExpiresAt = this.getVerificationExpirationDate();
     user.emailVerificationAttempts = 0;
     user.emailVerificationLastSentAt = new Date();
+    user.emailVerificationLockedUntil = null;
 
     const savedUser = await this.usersRepository.save(user);
 
@@ -305,13 +378,156 @@ export class AuthService implements OnModuleInit {
     };
   }
 
+  async requestPasswordReset(dto: RequestPasswordResetDto) {
+    const message =
+      'Si el correo existe y esta verificado, enviaremos un codigo de recuperacion.';
+    const user = await this.usersRepository.findOne({
+      where: { email: dto.email, isActive: true },
+    });
+
+    if (!user || !user.emailVerified) {
+      this.logger.warn(
+        `password reset requested email=${dto.email} reason=not_available`,
+      );
+      return { message };
+    }
+
+    if (this.isLocked(user.passwordResetLockedUntil)) {
+      this.logger.warn(`password reset blocked email=${user.email}`);
+      throw new HttpException(
+        'Demasiadas solicitudes. Intenta de nuevo mas tarde',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
+    if (user.passwordResetLastSentAt) {
+      const secondsSinceLastSend = Math.floor(
+        (Date.now() - user.passwordResetLastSentAt.getTime()) / 1000,
+      );
+
+      if (secondsSinceLastSend < this.passwordResetCooldownSeconds) {
+        throw new BadRequestException(
+          `Espera ${this.passwordResetCooldownSeconds - secondsSinceLastSend} segundos antes de solicitar otro codigo`,
+        );
+      }
+    }
+
+    const resetCode = this.generateVerificationCode();
+
+    user.passwordResetCodeHash = await bcrypt.hash(resetCode, 10);
+    user.passwordResetExpiresAt = this.getPasswordResetExpirationDate();
+    user.passwordResetAttempts = 0;
+    user.passwordResetLastSentAt = new Date();
+    user.passwordResetLockedUntil = null;
+
+    const savedUser = await this.usersRepository.save(user);
+
+    await this.mailService.sendPasswordResetCode(savedUser.email, resetCode);
+    this.logger.log(`password reset code sent userId=${savedUser.id}`);
+
+    return { message };
+  }
+
+  async resetPassword(dto: ResetPasswordDto) {
+    const user = await this.usersRepository.findOne({
+      where: { email: dto.email, isActive: true },
+    });
+
+    if (!user || !user.emailVerified) {
+      this.logger.warn(
+        `password reset failed email=${dto.email} reason=not_available`,
+      );
+      throw new UnauthorizedException('Codigo de recuperacion invalido');
+    }
+
+    if (!user.passwordResetCodeHash || !user.passwordResetExpiresAt) {
+      throw new BadRequestException('Solicita un codigo de recuperacion nuevo');
+    }
+
+    if (this.isLocked(user.passwordResetLockedUntil)) {
+      this.logger.warn(`password reset blocked email=${user.email}`);
+      throw new HttpException(
+        'Demasiados intentos. Solicita un nuevo codigo mas tarde',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
+    if (user.passwordResetAttempts >= this.maxPasswordResetAttempts) {
+      user.passwordResetLockedUntil = this.getLockoutExpirationDate(
+        this.passwordResetLockoutMs,
+      );
+      await this.usersRepository.save(user);
+
+      throw new HttpException(
+        'Demasiados intentos. Solicita un nuevo codigo mas tarde',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
+    if (user.passwordResetExpiresAt.getTime() < Date.now()) {
+      throw new BadRequestException('Codigo de recuperacion expirado');
+    }
+
+    const codeMatches = await bcrypt.compare(
+      dto.code,
+      user.passwordResetCodeHash,
+    );
+
+    if (!codeMatches) {
+      user.passwordResetAttempts += 1;
+
+      if (user.passwordResetAttempts >= this.maxPasswordResetAttempts) {
+        user.passwordResetLockedUntil = this.getLockoutExpirationDate(
+          this.passwordResetLockoutMs,
+        );
+        await this.usersRepository.save(user);
+        this.logger.warn(
+          `password reset locked email=${user.email} attempts=${user.passwordResetAttempts}`,
+        );
+
+        throw new HttpException(
+          'Demasiados intentos. Solicita un nuevo codigo mas tarde',
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+      }
+
+      await this.usersRepository.save(user);
+
+      throw new UnauthorizedException('Codigo de recuperacion invalido');
+    }
+
+    user.passwordHash = await bcrypt.hash(dto.password, 10);
+    user.passwordResetCodeHash = null;
+    user.passwordResetExpiresAt = null;
+    user.passwordResetAttempts = 0;
+    user.passwordResetLastSentAt = null;
+    user.passwordResetLockedUntil = null;
+    user.failedLoginAttempts = 0;
+    user.loginLockedUntil = null;
+
+    const savedUser = await this.usersRepository.save(user);
+    await this.revokeActiveUserSessions(savedUser.id);
+    this.logger.log(`password reset success userId=${savedUser.id}`);
+
+    return { message: 'Contrasena actualizada correctamente' };
+  }
+
   async login(dto: LoginDto) {
     const user = await this.usersRepository.findOne({
       where: { email: dto.email, isActive: true },
     });
 
     if (!user) {
+      this.logger.warn(`login failed email=${dto.email} reason=user_not_found`);
       throw new UnauthorizedException('Credenciales inválidas');
+    }
+
+    if (this.isLocked(user.loginLockedUntil)) {
+      this.logger.warn(`login blocked email=${user.email}`);
+      throw new HttpException(
+        'Demasiados intentos fallidos. Intenta de nuevo mas tarde',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
     }
 
     const passwordMatches = await bcrypt.compare(
@@ -320,10 +536,20 @@ export class AuthService implements OnModuleInit {
     );
 
     if (!passwordMatches) {
+      await this.recordFailedLogin(user);
+      if (this.isLocked(user.loginLockedUntil)) {
+        throw new HttpException(
+          'Demasiados intentos fallidos. Intenta de nuevo mas tarde',
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+      }
       throw new UnauthorizedException('Credenciales inválidas');
     }
 
     if (!user.emailVerified) {
+      this.logger.warn(
+        `login blocked email=${user.email} reason=email_unverified`,
+      );
       throw new UnauthorizedException({
         message: 'Debes verificar tu correo antes de iniciar sesion',
         requiresEmailVerification: true,
@@ -333,6 +559,8 @@ export class AuthService implements OnModuleInit {
 
     const { session, refreshToken } = await this.createRefreshSession(user.id);
     const accessToken = await this.signAccessToken(user, session.id);
+    await this.clearFailedLogins(user);
+    this.logger.log(`login success userId=${user.id} role=${user.role}`);
 
     return {
       accessToken,
@@ -343,6 +571,7 @@ export class AuthService implements OnModuleInit {
 
   async refresh(refreshToken?: string) {
     if (!refreshToken) {
+      this.logger.warn('refresh failed reason=missing_refresh_token');
       throw new UnauthorizedException('Sesion expirada');
     }
 
@@ -353,11 +582,13 @@ export class AuthService implements OnModuleInit {
     });
 
     if (!session) {
+      this.logger.warn('refresh failed reason=session_not_found');
       throw new UnauthorizedException('Sesion expirada');
     }
 
     if (session.expiresAt.getTime() <= now.getTime()) {
       await this.revokeSession(session, now);
+      this.logger.warn(`refresh failed sessionId=${session.id} reason=expired`);
       throw new UnauthorizedException('Sesion expirada');
     }
 
@@ -366,6 +597,9 @@ export class AuthService implements OnModuleInit {
       now.getTime()
     ) {
       await this.revokeSession(session, now);
+      this.logger.warn(
+        `refresh failed sessionId=${session.id} reason=idle_timeout`,
+      );
       throw new UnauthorizedException('Sesion cerrada por inactividad');
     }
 
@@ -375,6 +609,9 @@ export class AuthService implements OnModuleInit {
 
     if (!user) {
       await this.revokeSession(session, now);
+      this.logger.warn(
+        `refresh failed sessionId=${session.id} reason=user_not_found`,
+      );
       throw new UnauthorizedException('Sesion expirada');
     }
 
@@ -385,6 +622,9 @@ export class AuthService implements OnModuleInit {
 
     await this.refreshSessionsRepository.save(session);
     const accessToken = await this.signAccessToken(user, session.id);
+    this.logger.log(
+      `refresh success userId=${user.id} sessionId=${session.id}`,
+    );
 
     return {
       accessToken,
@@ -395,6 +635,7 @@ export class AuthService implements OnModuleInit {
 
   async logout(refreshToken?: string) {
     if (!refreshToken) {
+      this.logger.log('logout success reason=no_refresh_token');
       return { message: 'Sesion cerrada' };
     }
 
@@ -407,6 +648,9 @@ export class AuthService implements OnModuleInit {
 
     if (session) {
       await this.revokeSession(session, new Date());
+      this.logger.log(
+        `logout success sessionId=${session.id} userId=${session.userId}`,
+      );
     }
 
     return { message: 'Sesion cerrada' };
@@ -478,9 +722,13 @@ export class AuthService implements OnModuleInit {
 
   private getVerificationExpirationDate() {
     const expiresAt = new Date();
-    expiresAt.setMinutes(
-      expiresAt.getMinutes() + this.verificationTtlMinutes,
-    );
+    expiresAt.setMinutes(expiresAt.getMinutes() + this.verificationTtlMinutes);
+    return expiresAt;
+  }
+
+  private getPasswordResetExpirationDate() {
+    const expiresAt = new Date();
+    expiresAt.setMinutes(expiresAt.getMinutes() + this.passwordResetTtlMinutes);
     return expiresAt;
   }
 
@@ -491,6 +739,7 @@ export class AuthService implements OnModuleInit {
     user.emailVerificationExpiresAt = this.getVerificationExpirationDate();
     user.emailVerificationAttempts = 0;
     user.emailVerificationLastSentAt = new Date();
+    user.emailVerificationLockedUntil = null;
 
     const savedUser = await this.usersRepository.save(user);
 
@@ -505,6 +754,43 @@ export class AuthService implements OnModuleInit {
       user: this.toSafeUser(savedUser),
       requiresEmailVerification: true,
     };
+  }
+
+  private isLocked(lockedUntil?: Date | null) {
+    return Boolean(lockedUntil && lockedUntil.getTime() > Date.now());
+  }
+
+  private getLockoutExpirationDate(lockoutMs: number) {
+    return new Date(Date.now() + lockoutMs);
+  }
+
+  private async recordFailedLogin(user: User) {
+    user.failedLoginAttempts = (user.failedLoginAttempts ?? 0) + 1;
+
+    if (user.failedLoginAttempts >= this.maxFailedLoginAttempts) {
+      user.loginLockedUntil = this.getLockoutExpirationDate(
+        this.loginLockoutMs,
+      );
+      this.logger.warn(
+        `login locked email=${user.email} attempts=${user.failedLoginAttempts}`,
+      );
+    } else {
+      this.logger.warn(
+        `login failed email=${user.email} attempts=${user.failedLoginAttempts}`,
+      );
+    }
+
+    await this.usersRepository.save(user);
+  }
+
+  private async clearFailedLogins(user: User) {
+    if (!user.failedLoginAttempts && !user.loginLockedUntil) {
+      return;
+    }
+
+    user.failedLoginAttempts = 0;
+    user.loginLockedUntil = null;
+    await this.usersRepository.save(user);
   }
 
   private async createRefreshSession(userId: string) {
@@ -554,6 +840,13 @@ export class AuthService implements OnModuleInit {
   private async revokeSession(session: RefreshSession, revokedAt: Date) {
     session.revokedAt = revokedAt;
     await this.refreshSessionsRepository.save(session);
+  }
+
+  private async revokeActiveUserSessions(userId: string) {
+    await this.refreshSessionsRepository.update(
+      { userId, revokedAt: IsNull() },
+      { revokedAt: new Date() },
+    );
   }
 
   private toSafeUser(user: User) {
@@ -626,9 +919,7 @@ export class AuthService implements OnModuleInit {
 
     switch (mimetype) {
       case 'image/jpeg':
-        return (
-          buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff
-        );
+        return buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
       case 'image/png':
         return (
           buffer[0] === 0x89 &&

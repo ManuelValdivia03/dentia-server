@@ -66,6 +66,30 @@ export class User {
   @Column({ type: 'timestamptz', nullable: true })
   emailVerificationLastSentAt!: Date | null;
 
+  @Column({ type: 'timestamptz', nullable: true })
+  emailVerificationLockedUntil!: Date | null;
+
+  @Column({ default: 0 })
+  failedLoginAttempts!: number;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  loginLockedUntil!: Date | null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  passwordResetCodeHash!: string | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  passwordResetExpiresAt!: Date | null;
+
+  @Column({ default: 0 })
+  passwordResetAttempts!: number;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  passwordResetLastSentAt!: Date | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  passwordResetLockedUntil!: Date | null;
+
   @CreateDateColumn()
   createdAt!: Date;
 

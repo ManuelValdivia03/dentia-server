@@ -116,6 +116,57 @@ describe('AuthService', () => {
     );
   });
 
+  it('requestPasswordReset debe reenviar la peticion a auth-service', async () => {
+    const dto = {
+      email: 'gateway@dentia.local',
+    };
+
+    const responseData = {
+      message:
+        'Si el correo existe y esta verificado, enviaremos un codigo de recuperacion.',
+    };
+
+    httpService.post.mockReturnValueOnce(
+      of({
+        data: responseData,
+      } as any),
+    );
+
+    const result = await service.requestPasswordReset(dto);
+
+    expect(result).toEqual(responseData);
+    expect(httpService.post).toHaveBeenCalledWith(
+      'http://localhost:3001/auth/forgot-password',
+      dto,
+    );
+  });
+
+  it('resetPassword debe reenviar la peticion a auth-service', async () => {
+    const dto = {
+      email: 'gateway@dentia.local',
+      code: '123456',
+      password: 'NewPassword123',
+    };
+
+    const responseData = {
+      message: 'Contrasena actualizada correctamente',
+    };
+
+    httpService.post.mockReturnValueOnce(
+      of({
+        data: responseData,
+      } as any),
+    );
+
+    const result = await service.resetPassword(dto);
+
+    expect(result).toEqual(responseData);
+    expect(httpService.post).toHaveBeenCalledWith(
+      'http://localhost:3001/auth/reset-password',
+      dto,
+    );
+  });
+
   it('login debe regresar login exitoso', async () => {
     const dto = {
       email: 'gateway@dentia.local',

@@ -7,6 +7,8 @@ import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
 import { ResendVerificationCodeDto } from './dto/resend-verification-code.dto';
+import { RequestPasswordResetDto } from './dto/request-password-reset.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 
 @Injectable()
 export class AuthService {
@@ -99,6 +101,24 @@ export class AuthService {
     return this.forwardRequest(() =>
       this.httpService.post(
         `${this.authServiceBaseUrl}/auth/resend-verification-code`,
+        dto,
+      ),
+    );
+  }
+
+  requestPasswordReset(dto: RequestPasswordResetDto) {
+    return this.forwardRequest(() =>
+      this.httpService.post(
+        `${this.authServiceBaseUrl}/auth/forgot-password`,
+        dto,
+      ),
+    );
+  }
+
+  resetPassword(dto: ResetPasswordDto) {
+    return this.forwardRequest(() =>
+      this.httpService.post(
+        `${this.authServiceBaseUrl}/auth/reset-password`,
         dto,
       ),
     );

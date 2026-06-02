@@ -10,6 +10,8 @@ describe('AuthController', () => {
       register: jest.fn(),
       verifyEmail: jest.fn(),
       resendVerificationCode: jest.fn(),
+      requestPasswordReset: jest.fn(),
+      resetPassword: jest.fn(),
       login: jest.fn(),
       refresh: jest.fn(),
       logout: jest.fn(),
@@ -88,6 +90,43 @@ describe('AuthController', () => {
     const result = await controller.resendVerificationCode(dto as any);
 
     expect(service.resendVerificationCode).toHaveBeenCalledWith(dto);
+    expect(result).toEqual(expected);
+  });
+
+  it('requestPasswordReset debe delegar al service', async () => {
+    const dto = {
+      email: 'gateway@dentia.local',
+    };
+
+    const expected = {
+      message:
+        'Si el correo existe y esta verificado, enviaremos un codigo de recuperacion.',
+    };
+
+    service.requestPasswordReset.mockResolvedValueOnce(expected as any);
+
+    const result = await controller.requestPasswordReset(dto as any);
+
+    expect(service.requestPasswordReset).toHaveBeenCalledWith(dto);
+    expect(result).toEqual(expected);
+  });
+
+  it('resetPassword debe delegar al service', async () => {
+    const dto = {
+      email: 'gateway@dentia.local',
+      code: '123456',
+      password: 'NewPassword123',
+    };
+
+    const expected = {
+      message: 'Contrasena actualizada correctamente',
+    };
+
+    service.resetPassword.mockResolvedValueOnce(expected as any);
+
+    const result = await controller.resetPassword(dto as any);
+
+    expect(service.resetPassword).toHaveBeenCalledWith(dto);
     expect(result).toEqual(expected);
   });
 

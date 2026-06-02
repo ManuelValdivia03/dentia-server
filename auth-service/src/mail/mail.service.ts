@@ -44,11 +44,54 @@ export class MailService {
           </div>
         `,
       });
-      } catch (error) {
+    } catch (error) {
       console.error('SMTP SEND ERROR:', error);
 
       throw new ServiceUnavailableException(
         'No se pudo enviar el correo de verificación',
+      );
+    }
+  }
+
+  async sendPasswordResetCode(to: string, code: string) {
+    if (!this.smtpHost || !this.smtpUser || !this.smtpPass) {
+      console.warn(
+        `[MAIL DEV] SMTP no configurado. Codigo de recuperacion para ${to}: ${code}`,
+      );
+      return;
+    }
+
+    const transporter = nodemailer.createTransport({
+      host: this.smtpHost,
+      port: this.smtpPort,
+      secure: this.smtpPort === 465,
+      auth: {
+        user: this.smtpUser,
+        pass: this.smtpPass,
+      },
+    });
+
+    try {
+      await transporter.sendMail({
+        from: this.mailFrom,
+        to,
+        subject: 'Recuperacion de contrasena - Dentia',
+        text: `Tu codigo para recuperar tu contrasena de Dentia es: ${code}. Este codigo expira en 10 minutos.`,
+        html: `
+          <div style="font-family: Arial, sans-serif;">
+            <h2>Recuperacion de contrasena - Dentia</h2>
+            <p>Tu codigo de recuperacion es:</p>
+            <h1 style="letter-spacing: 4px;">${code}</h1>
+            <p>Este codigo expira en 10 minutos.</p>
+            <p>Si no solicitaste este cambio, ignora este correo.</p>
+          </div>
+        `,
+      });
+    } catch (error) {
+      console.error('SMTP SEND ERROR:', error);
+
+      throw new ServiceUnavailableException(
+        'No se pudo enviar el correo de recuperacion',
       );
     }
   }

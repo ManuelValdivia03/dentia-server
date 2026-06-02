@@ -8,6 +8,7 @@ import { RolesGuard } from './guards/roles.guard';
 import { UsersController } from '../users/users.controller';
 import { DentistsController } from '../dentists/dentists.controller';
 import { ProfilePhotosController } from '../dentists/profile-photos.controller';
+import { RateLimitGuard } from './rate-limit.guard';
 
 @Module({
   imports: [
@@ -23,7 +24,7 @@ import { ProfilePhotosController } from '../dentists/profile-photos.controller';
     DentistsController,
     ProfilePhotosController,
   ],
-  providers: [AuthService, JwtAuthGuard, RolesGuard],
+  providers: [AuthService, JwtAuthGuard, RolesGuard, RateLimitGuard],
   exports: [AuthService, JwtAuthGuard, RolesGuard, JwtModule],
 })
 export class AuthModule {}
