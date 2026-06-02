@@ -13,6 +13,9 @@ describe('FilesController', () => {
   };
 
   const req = {
+    headers: {
+      authorization: 'Bearer test-token',
+    },
     user: {
       sub: 'uuid-user',
       domainId: 'p1',
@@ -47,7 +50,7 @@ describe('FilesController', () => {
     expect(filesServiceMock.upload).toHaveBeenCalledWith(
       file,
       req.body,
-      req.user,
+      req.headers.authorization,
     );
 
     expect(result).toEqual({
@@ -57,12 +60,12 @@ describe('FilesController', () => {
   });
 
   it('rejects upload without file', () => {
-  expect(() => controller.upload(undefined as any, req)).toThrow(
-    BadRequestException,
-  );
+    expect(() => controller.upload(undefined as any, req)).toThrow(
+      BadRequestException,
+    );
 
-  expect(filesServiceMock.upload).not.toHaveBeenCalled();
-});
+    expect(filesServiceMock.upload).not.toHaveBeenCalled();
+  });
 
   it('delegates findAll to FilesService', async () => {
     const query = { appointmentId: 'appt1' };
@@ -70,7 +73,10 @@ describe('FilesController', () => {
 
     const result = await controller.findAll(query, req);
 
-    expect(filesServiceMock.findAll).toHaveBeenCalledWith(query, req.user);
+    expect(filesServiceMock.findAll).toHaveBeenCalledWith(
+      query,
+      req.headers.authorization,
+    );
     expect(result).toEqual([]);
   });
 
@@ -81,7 +87,10 @@ describe('FilesController', () => {
 
     const result = await controller.findOne('file1', req);
 
-    expect(filesServiceMock.findOne).toHaveBeenCalledWith('file1', req.user);
+    expect(filesServiceMock.findOne).toHaveBeenCalledWith(
+      'file1',
+      req.headers.authorization,
+    );
     expect(result).toEqual({
       id: 'file1',
     });
@@ -95,7 +104,10 @@ describe('FilesController', () => {
 
     const result = await controller.remove('file1', req);
 
-    expect(filesServiceMock.remove).toHaveBeenCalledWith('file1', req.user);
+    expect(filesServiceMock.remove).toHaveBeenCalledWith(
+      'file1',
+      req.headers.authorization,
+    );
     expect(result).toEqual({
       deleted: true,
       id: 'file1',

@@ -1,8 +1,14 @@
-import { Injectable, ServiceUnavailableException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
 
 @Injectable()
 export class MailService {
+  private readonly logger = new Logger(MailService.name);
+
   private readonly smtpHost = process.env.SMTP_HOST;
   private readonly smtpPort = Number(process.env.SMTP_PORT ?? 587);
   private readonly smtpUser = process.env.SMTP_USER;
@@ -45,7 +51,15 @@ export class MailService {
         `,
       });
     } catch (error) {
-      console.error('SMTP SEND ERROR:', error);
+      this.logger.error(
+        JSON.stringify({
+          event: 'email_send_failed',
+          service: 'auth-service',
+          emailType: 'verification',
+          recipient: to,
+          reason: error instanceof Error ? error.message : 'unknown',
+        }),
+      );
 
       throw new ServiceUnavailableException(
         'No se pudo enviar el correo de verificación',
@@ -88,7 +102,15 @@ export class MailService {
         `,
       });
     } catch (error) {
-      console.error('SMTP SEND ERROR:', error);
+      this.logger.error(
+        JSON.stringify({
+          event: 'email_send_failed',
+          service: 'auth-service',
+          emailType: 'password_reset',
+          recipient: to,
+          reason: error instanceof Error ? error.message : 'unknown',
+        }),
+      );
 
       throw new ServiceUnavailableException(
         'No se pudo enviar el correo de recuperacion',

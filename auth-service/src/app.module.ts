@@ -1,9 +1,13 @@
 import { Module } from '@nestjs/common';
+import { APP_INTERCEPTOR } from '@nestjs/core';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { HealthController } from './health.controller';
 import { AuthModule } from './auth/auth.module';
 import { User } from './users/entities/user.entity';
 import { RefreshSession } from './auth/entities/refresh-session.entity';
+import { MetricsController } from './observability/metrics.controller';
+import { HttpObservabilityInterceptor } from './observability/http-observability.interceptor';
+import { MetricsService } from './observability/metrics.service';
 
 @Module({
   imports: [
@@ -19,6 +23,13 @@ import { RefreshSession } from './auth/entities/refresh-session.entity';
     }),
     AuthModule,
   ],
-  controllers: [HealthController],
+  controllers: [HealthController, MetricsController],
+  providers: [
+    MetricsService,
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: HttpObservabilityInterceptor,
+    },
+  ],
 })
 export class AppModule {}

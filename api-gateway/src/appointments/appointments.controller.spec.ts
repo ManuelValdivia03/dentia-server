@@ -7,6 +7,7 @@ import { UserRole } from '../auth/enums/user-role.enum';
 describe('AppointmentsController', () => {
   let controller: AppointmentsController;
   let service: jest.Mocked<AppointmentsService>;
+  const authorization = 'Bearer test-token';
 
   const appointments = [
     {
@@ -42,6 +43,7 @@ describe('AppointmentsController', () => {
     service.findAll.mockResolvedValueOnce([appointments[0]] as any);
 
     const req: any = {
+      headers: { authorization },
       user: {
         sub: 'u1',
         role: UserRole.PATIENT,
@@ -52,7 +54,7 @@ describe('AppointmentsController', () => {
 
     const result = await controller.findAll(req);
 
-    expect(service.findAll).toHaveBeenCalledWith(req.user);
+    expect(service.findAll).toHaveBeenCalledWith(authorization);
     expect(result).toEqual([appointments[0]]);
   });
 
@@ -60,6 +62,7 @@ describe('AppointmentsController', () => {
     service.findAll.mockResolvedValueOnce([appointments[1]] as any);
 
     const req: any = {
+      headers: { authorization },
       user: {
         sub: 'u2',
         role: UserRole.DENTIST,
@@ -70,7 +73,7 @@ describe('AppointmentsController', () => {
 
     const result = await controller.findAll(req);
 
-    expect(service.findAll).toHaveBeenCalledWith(req.user);
+    expect(service.findAll).toHaveBeenCalledWith(authorization);
     expect(result).toEqual([appointments[1]]);
   });
 
@@ -78,6 +81,7 @@ describe('AppointmentsController', () => {
     service.findAll.mockResolvedValueOnce(appointments as any);
 
     const req: any = {
+      headers: { authorization },
       user: {
         sub: 'u3',
         role: UserRole.ADMIN,
@@ -88,7 +92,7 @@ describe('AppointmentsController', () => {
 
     const result = await controller.findAll(req);
 
-    expect(service.findAll).toHaveBeenCalledWith(req.user);
+    expect(service.findAll).toHaveBeenCalledWith(authorization);
     expect(result).toEqual(appointments);
   });
 
@@ -102,6 +106,7 @@ describe('AppointmentsController', () => {
     };
 
     const req: any = {
+      headers: { authorization },
       user: {
         sub: 'u1',
         role: UserRole.PATIENT,
@@ -122,7 +127,7 @@ describe('AppointmentsController', () => {
         ...dto,
         patientId: 'p1',
       },
-      req.user,
+      authorization,
     );
     expect(result).toEqual({
       ...dto,
@@ -140,6 +145,7 @@ describe('AppointmentsController', () => {
     };
 
     const req: any = {
+      headers: { authorization },
       user: {
         sub: 'u3',
         role: UserRole.ADMIN,
@@ -152,12 +158,13 @@ describe('AppointmentsController', () => {
 
     const result = await controller.create(dto, req);
 
-    expect(service.create).toHaveBeenCalledWith(dto, req.user);
+    expect(service.create).toHaveBeenCalledWith(dto, authorization);
     expect(result).toEqual(dto);
   });
 
   it('debe delegar confirm con id y req.user', async () => {
     const req: any = {
+      headers: { authorization },
       user: {
         sub: 'u2',
         role: UserRole.DENTIST,
@@ -177,12 +184,13 @@ describe('AppointmentsController', () => {
 
     const result = await controller.confirm('a1', req);
 
-    expect(service.confirm).toHaveBeenCalledWith('a1', req.user);
+    expect(service.confirm).toHaveBeenCalledWith('a1', authorization);
     expect(result).toEqual(appointment);
   });
 
   it('debe delegar findOne con id y req.user', async () => {
     const req: any = {
+      headers: { authorization },
       user: {
         sub: 'u3',
         role: UserRole.ADMIN,
@@ -201,7 +209,7 @@ describe('AppointmentsController', () => {
 
     const result = await controller.findOne('a2', req);
 
-    expect(service.findOne).toHaveBeenCalledWith('a2', req.user);
+    expect(service.findOne).toHaveBeenCalledWith('a2', authorization);
     expect(result).toEqual(appointment);
   });
 });

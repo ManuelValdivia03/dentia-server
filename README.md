@@ -189,6 +189,9 @@ docker compose config
 | files-service        | http://localhost:3005/swagger |
 | reports-service      | http://localhost:3006/docs    |
 
+Guia de operacion, health checks, metricas, logs y pruebas:
+[docs/operations.md](docs/operations.md).
+
 ---
 
 ## Usuarios seed

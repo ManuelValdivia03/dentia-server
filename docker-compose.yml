@@ -255,6 +255,7 @@ services:
       PORT: ${API_GATEWAY_PORT}
       AUTH_SERVICE_URL: http://auth-service:3001
       APPOINTMENTS_SERVICE_URL: http://appointments-service:3002
+      PRESCRIPTIONS_SERVICE_URL: http://prescriptions-service:3003
       PRESCRIPTIONS_TCP_HOST: prescriptions-service
       PRESCRIPTIONS_TCP_PORT: ${PRESCRIPTIONS_TCP_PORT}
       CHAT_SERVICE_URL: http://chat-service:3004

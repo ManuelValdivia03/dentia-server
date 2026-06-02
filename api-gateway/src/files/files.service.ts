@@ -1,9 +1,11 @@
-import { HttpException, Injectable } from '@nestjs/common';
+import { HttpException, Injectable, Logger } from '@nestjs/common';
 import axios, { AxiosError } from 'axios';
 import FormData from 'form-data';
 
 @Injectable()
 export class FilesService {
+  private readonly logger = new Logger(FilesService.name);
+
   private readonly filesServiceUrl =
     process.env.FILES_SERVICE_URL ?? 'http://localhost:3005';
 
@@ -96,12 +98,25 @@ export class FilesService {
     const axiosError = error as AxiosError<any>;
 
     if (axiosError.response) {
+      this.logServiceFailure(axiosError.response.status);
       throw new HttpException(
         axiosError.response.data,
         axiosError.response.status,
       );
     }
 
+    this.logServiceFailure();
     throw new HttpException(fallbackMessage, 503);
+  }
+
+  private logServiceFailure(statusCode?: number) {
+    this.logger.warn(
+      JSON.stringify({
+        event: 'service_call_failed',
+        service: 'api-gateway',
+        targetService: 'files-service',
+        statusCode,
+      }),
+    );
   }
 }

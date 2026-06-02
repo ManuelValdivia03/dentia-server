@@ -1,9 +1,11 @@
-import { HttpException, Injectable } from '@nestjs/common';
+import { HttpException, Injectable, Logger } from '@nestjs/common';
 import axios, { AxiosError } from 'axios';
 import { FilesService } from '../files/files.service';
 
 @Injectable()
 export class ChatService {
+  private readonly logger = new Logger(ChatService.name);
+
   private readonly chatServiceUrl =
     process.env.CHAT_SERVICE_URL ?? 'http://localhost:3004';
 
@@ -56,7 +58,11 @@ export class ChatService {
         throw new HttpException('Authorization header is required', 401);
       }
 
-      const uploaded = await this.filesService.upload(file, body, authorization);
+      const uploaded = await this.filesService.upload(
+        file,
+        body,
+        authorization,
+      );
 
       payload.attachment = {
         fileId: uploaded.id,
@@ -104,13 +110,26 @@ export class ChatService {
       const axiosError = error as AxiosError<any>;
 
       if (axiosError.response) {
+        this.logServiceFailure(axiosError.response.status);
         throw new HttpException(
           axiosError.response.data,
           axiosError.response.status,
         );
       }
 
+      this.logServiceFailure();
       throw new HttpException('Chat service unavailable', 503);
     }
+  }
+
+  private logServiceFailure(statusCode?: number) {
+    this.logger.warn(
+      JSON.stringify({
+        event: 'service_call_failed',
+        service: 'api-gateway',
+        targetService: 'chat-service',
+        statusCode,
+      }),
+    );
   }
 }

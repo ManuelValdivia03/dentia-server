@@ -1,9 +1,16 @@
-import { HttpException, Injectable, ServiceUnavailableException } from '@nestjs/common';
+import {
+  HttpException,
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
 import { RescheduleAppointmentDto } from './dto/reschedule-appointment.dto';
 
 @Injectable()
 export class AppointmentsService {
+  private readonly logger = new Logger(AppointmentsService.name);
+
   private readonly appointmentsServiceUrl =
     process.env.APPOINTMENTS_SERVICE_URL ?? 'http://appointments-service:3002';
 
@@ -46,7 +53,11 @@ export class AppointmentsService {
     });
   }
 
-  async reschedule(id: string, dto: RescheduleAppointmentDto, authHeader: string) {
+  async reschedule(
+    id: string,
+    dto: RescheduleAppointmentDto,
+    authHeader: string,
+  ) {
     return this.request(`/appointments/${id}/reschedule`, {
       method: 'PATCH',
       authHeader,
@@ -119,6 +130,7 @@ export class AppointmentsService {
           data?.title ??
           `appointments-service error: ${response.status}`;
 
+        this.logServiceFailure(path, response.status);
         throw new HttpException(message, response.status);
       }
 
@@ -128,9 +140,22 @@ export class AppointmentsService {
         throw error;
       }
 
+      this.logServiceFailure(path);
       throw new ServiceUnavailableException(
         'appointments-service is unavailable',
       );
     }
+  }
+
+  private logServiceFailure(path: string, statusCode?: number) {
+    this.logger.warn(
+      JSON.stringify({
+        event: 'service_call_failed',
+        service: 'api-gateway',
+        targetService: 'appointments-service',
+        path,
+        statusCode,
+      }),
+    );
   }
 }

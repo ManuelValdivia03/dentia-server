@@ -2,12 +2,15 @@ import {
   BadGatewayException,
   HttpException,
   Injectable,
+  Logger,
 } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 
 @Injectable()
 export class ReportsService {
+  private readonly logger = new Logger(ReportsService.name);
+
   private readonly reportsServiceUrl =
     process.env.REPORTS_SERVICE_URL ?? 'http://reports-service:3006';
 
@@ -88,9 +91,22 @@ export class ReportsService {
     const data = error?.response?.data;
 
     if (status) {
+      this.logServiceFailure(status);
       throw new HttpException(data, status);
     }
 
+    this.logServiceFailure();
     throw new BadGatewayException('reports-service is not available');
+  }
+
+  private logServiceFailure(statusCode?: number) {
+    this.logger.warn(
+      JSON.stringify({
+        event: 'service_call_failed',
+        service: 'api-gateway',
+        targetService: 'reports-service',
+        statusCode,
+      }),
+    );
   }
 }

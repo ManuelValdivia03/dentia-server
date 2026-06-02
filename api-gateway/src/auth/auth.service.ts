@@ -1,5 +1,5 @@
 import { HttpService } from '@nestjs/axios';
-import { HttpException, Injectable } from '@nestjs/common';
+import { HttpException, Injectable, Logger } from '@nestjs/common';
 import axios, { AxiosError, AxiosResponse } from 'axios';
 import FormData from 'form-data';
 import { firstValueFrom, Observable } from 'rxjs';
@@ -12,6 +12,8 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   private readonly authServiceBaseUrl =
     process.env.AUTH_SERVICE_URL ?? 'http://localhost:3001';
 
@@ -49,12 +51,18 @@ export class AuthService {
       const axiosError = error as AxiosError;
 
       if (axiosError.response) {
+        this.logServiceFailure(
+          'auth-service',
+          'register',
+          axiosError.response.status,
+        );
         throw new HttpException(
           (axiosError.response.data as any) ?? 'Error en auth-service',
           axiosError.response.status,
         );
       }
 
+      this.logServiceFailure('auth-service', 'register');
       throw new HttpException('No se pudo conectar con auth-service', 503);
     }
   }
@@ -78,12 +86,18 @@ export class AuthService {
       const axiosError = error as AxiosError;
 
       if (axiosError.response) {
+        this.logServiceFailure(
+          'auth-service',
+          'profile-photo',
+          axiosError.response.status,
+        );
         throw new HttpException(
           'Foto de perfil no encontrada',
           axiosError.response.status,
         );
       }
 
+      this.logServiceFailure('auth-service', 'profile-photo');
       throw new HttpException('No se pudo conectar con auth-service', 503);
     }
   }
@@ -184,12 +198,18 @@ export class AuthService {
       const axiosError = error as AxiosError;
 
       if (axiosError.response) {
+        this.logServiceFailure(
+          'auth-service',
+          'forward-request',
+          axiosError.response.status,
+        );
         throw new HttpException(
           axiosError.response.data ?? 'Error en auth-service',
           axiosError.response.status,
         );
       }
 
+      this.logServiceFailure('auth-service', 'forward-request');
       throw new HttpException('No se pudo conectar con auth-service', 503);
     }
   }
@@ -208,13 +228,35 @@ export class AuthService {
       const axiosError = error as AxiosError;
 
       if (axiosError.response) {
+        this.logServiceFailure(
+          'auth-service',
+          'forward-request-with-cookies',
+          axiosError.response.status,
+        );
         throw new HttpException(
           axiosError.response.data ?? 'Error en auth-service',
           axiosError.response.status,
         );
       }
 
+      this.logServiceFailure('auth-service', 'forward-request-with-cookies');
       throw new HttpException('No se pudo conectar con auth-service', 503);
     }
+  }
+
+  private logServiceFailure(
+    targetService: string,
+    operation: string,
+    statusCode?: number,
+  ) {
+    this.logger.warn(
+      JSON.stringify({
+        event: 'service_call_failed',
+        service: 'api-gateway',
+        targetService,
+        operation,
+        statusCode,
+      }),
+    );
   }
 }
