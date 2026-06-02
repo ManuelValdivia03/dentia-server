@@ -44,7 +44,7 @@ export class AuthController {
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     description:
-      'Datos de registro. La foto es opcional. Los campos de dentista son obligatorios solo si role es DENTIST.',
+      'Datos de registro. La foto es opcional para pacientes y obligatoria para dentistas. Los campos profesionales son obligatorios solo si role es DENTIST.',
     schema: {
       type: 'object',
       required: ['email', 'password', 'fullName'],
@@ -60,7 +60,7 @@ export class AuthController {
         },
         fullName: {
           type: 'string',
-          example: 'Juan Pérez',
+          example: 'Juan Perez',
         },
         role: {
           type: 'string',
@@ -74,26 +74,32 @@ export class AuthController {
         },
         escuela: {
           type: 'string',
-          example: 'Universidad Nacional Autónoma de México',
+          example: 'Universidad Nacional Autonoma de Mexico',
           description: 'Obligatoria solo si role es DENTIST.',
         },
         descripcion: {
           type: 'string',
           example:
-            'Cirujano dentista con experiencia en odontología general y atención preventiva.',
+            'Cirujano dentista con experiencia en odontologia general y atencion preventiva.',
           description: 'Obligatoria solo si role es DENTIST.',
         },
         photo: {
           type: 'string',
           format: 'binary',
-          description: 'Foto de perfil opcional. Tamaño máximo: 5 MB.',
+          description:
+            'Foto de perfil. Opcional para pacientes y obligatoria para dentistas. Tamano maximo: 5 MB.',
         },
       },
     },
   })
-  @ApiCreatedResponse({ description: 'Usuario registrado correctamente.' })
-  @ApiBadRequestResponse({ description: 'Datos inválidos.' })
-  @ApiConflictResponse({ description: 'El correo ya está registrado.' })
+  @ApiCreatedResponse({
+    description:
+      'Registro iniciado. Si el correo ya tenia verificacion pendiente, se envia un nuevo codigo.',
+  })
+  @ApiBadRequestResponse({ description: 'Datos invalidos.' })
+  @ApiConflictResponse({
+    description: 'El correo ya esta registrado y verificado.',
+  })
   @ApiResponse({ status: 415, description: 'Archivo no soportado.' })
   @ApiServiceUnavailableResponse({ description: 'auth-service no disponible.' })
   register(
@@ -105,10 +111,10 @@ export class AuthController {
 
   @Post('verify-email')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Verificar correo electrónico' })
+  @ApiOperation({ summary: 'Verificar correo electronico' })
   @ApiBody({ type: VerifyEmailDto })
   @ApiOkResponse({ description: 'Correo verificado correctamente.' })
-  @ApiBadRequestResponse({ description: 'Código inválido o datos incorrectos.' })
+  @ApiBadRequestResponse({ description: 'Codigo invalido o datos incorrectos.' })
   @ApiServiceUnavailableResponse({ description: 'auth-service no disponible.' })
   verifyEmail(@Body() dto: VerifyEmailDto) {
     return this.authService.verifyEmail(dto);
@@ -116,10 +122,10 @@ export class AuthController {
 
   @Post('resend-verification-code')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Reenviar código de verificación' })
+  @ApiOperation({ summary: 'Reenviar codigo de verificacion' })
   @ApiBody({ type: ResendVerificationCodeDto })
-  @ApiOkResponse({ description: 'Código reenviado correctamente.' })
-  @ApiBadRequestResponse({ description: 'Correo inválido.' })
+  @ApiOkResponse({ description: 'Codigo reenviado correctamente.' })
+  @ApiBadRequestResponse({ description: 'Correo invalido.' })
   @ApiServiceUnavailableResponse({ description: 'auth-service no disponible.' })
   resendVerificationCode(@Body() dto: ResendVerificationCodeDto) {
     return this.authService.resendVerificationCode(dto);
@@ -127,11 +133,14 @@ export class AuthController {
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Iniciar sesión' })
+  @ApiOperation({ summary: 'Iniciar sesion' })
   @ApiBody({ type: LoginDto })
   @ApiOkResponse({ description: 'Login exitoso.' })
-  @ApiUnauthorizedResponse({ description: 'Credenciales inválidas.' })
-  @ApiBadRequestResponse({ description: 'Datos inválidos.' })
+  @ApiUnauthorizedResponse({
+    description:
+      'Credenciales invalidas o correo pendiente de verificacion. Si requiere verificacion, la respuesta incluye requiresEmailVerification y email.',
+  })
+  @ApiBadRequestResponse({ description: 'Datos invalidos.' })
   @ApiServiceUnavailableResponse({ description: 'auth-service no disponible.' })
   async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
     const result = await this.authService.login(dto);
@@ -146,6 +155,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Renovar sesion activa' })
   @ApiOkResponse({ description: 'Sesion renovada correctamente.' })
   @ApiUnauthorizedResponse({ description: 'Sesion expirada o invalida.' })
+  @ApiServiceUnavailableResponse({ description: 'auth-service no disponible.' })
   async refresh(
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
@@ -161,6 +171,7 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Cerrar sesion' })
   @ApiOkResponse({ description: 'Sesion cerrada correctamente.' })
+  @ApiServiceUnavailableResponse({ description: 'auth-service no disponible.' })
   async logout(
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
