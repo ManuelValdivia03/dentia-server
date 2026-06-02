@@ -10,9 +10,9 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { JwtService } from '@nestjs/jwt';
-import { Repository } from 'typeorm';
+import { IsNull, Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
-import { randomInt, randomUUID } from 'crypto';
+import { createHash, randomBytes, randomInt, randomUUID } from 'crypto';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
@@ -20,6 +20,14 @@ import { ResendVerificationCodeDto } from './dto/resend-verification-code.dto';
 import { User } from '../users/entities/user.entity';
 import { UserRole } from '../users/enums/user-role.enum';
 import { MailService } from '../mail/mail.service';
+import { RefreshSession } from './entities/refresh-session.entity';
+
+function getEnvNumber(name: string, fallback: number) {
+  const value = process.env[name];
+  const parsed = Number(value);
+
+  return value && Number.isFinite(parsed) ? parsed : fallback;
+}
 
 @Injectable()
 export class AuthService implements OnModuleInit {
@@ -35,9 +43,19 @@ export class AuthService implements OnModuleInit {
     process.env.EMAIL_VERIFICATION_MAX_ATTEMPTS ?? 5,
   );
 
+  private readonly accessTokenTtl = process.env.ACCESS_TOKEN_TTL || '2m';
+
+  private readonly refreshIdleTimeoutMs =
+    getEnvNumber('REFRESH_TOKEN_IDLE_TIMEOUT_SECONDS', 300) * 1000;
+
+  private readonly refreshAbsoluteTtlMs =
+    getEnvNumber('REFRESH_TOKEN_ABSOLUTE_TTL_SECONDS', 28800) * 1000;
+
   constructor(
     @InjectRepository(User)
     private readonly usersRepository: Repository<User>,
+    @InjectRepository(RefreshSession)
+    private readonly refreshSessionsRepository: Repository<RefreshSession>,
     private readonly jwtService: JwtService,
     private readonly mailService: MailService,
   ) {}
@@ -308,19 +326,85 @@ export class AuthService implements OnModuleInit {
       );
     }
 
-    const payload = {
-      sub: user.id,
-      role: user.role,
-      domainId: user.domainId,
-      email: user.email,
-    };
-
-    const accessToken = await this.jwtService.signAsync(payload);
+    const { session, refreshToken } = await this.createRefreshSession(user.id);
+    const accessToken = await this.signAccessToken(user, session.id);
 
     return {
       accessToken,
+      refreshToken,
       user: this.toSafeUser(user),
     };
+  }
+
+  async refresh(refreshToken?: string) {
+    if (!refreshToken) {
+      throw new UnauthorizedException('Sesion expirada');
+    }
+
+    const now = new Date();
+    const tokenHash = this.hashRefreshToken(refreshToken);
+    const session = await this.refreshSessionsRepository.findOne({
+      where: { tokenHash, revokedAt: IsNull() },
+    });
+
+    if (!session) {
+      throw new UnauthorizedException('Sesion expirada');
+    }
+
+    if (session.expiresAt.getTime() <= now.getTime()) {
+      await this.revokeSession(session, now);
+      throw new UnauthorizedException('Sesion expirada');
+    }
+
+    if (
+      session.lastActivityAt.getTime() + this.refreshIdleTimeoutMs <=
+      now.getTime()
+    ) {
+      await this.revokeSession(session, now);
+      throw new UnauthorizedException('Sesion cerrada por inactividad');
+    }
+
+    const user = await this.usersRepository.findOne({
+      where: { id: session.userId, isActive: true },
+    });
+
+    if (!user) {
+      await this.revokeSession(session, now);
+      throw new UnauthorizedException('Sesion expirada');
+    }
+
+    const nextRefreshToken = this.generateRefreshToken();
+
+    session.tokenHash = this.hashRefreshToken(nextRefreshToken);
+    session.lastActivityAt = now;
+
+    await this.refreshSessionsRepository.save(session);
+    const accessToken = await this.signAccessToken(user, session.id);
+
+    return {
+      accessToken,
+      refreshToken: nextRefreshToken,
+      user: this.toSafeUser(user),
+    };
+  }
+
+  async logout(refreshToken?: string) {
+    if (!refreshToken) {
+      return { message: 'Sesion cerrada' };
+    }
+
+    const session = await this.refreshSessionsRepository.findOne({
+      where: {
+        tokenHash: this.hashRefreshToken(refreshToken),
+        revokedAt: IsNull(),
+      },
+    });
+
+    if (session) {
+      await this.revokeSession(session, new Date());
+    }
+
+    return { message: 'Sesion cerrada' };
   }
 
   async getProfileByUserId(userId: string) {
@@ -385,6 +469,55 @@ export class AuthService implements OnModuleInit {
       expiresAt.getMinutes() + this.verificationTtlMinutes,
     );
     return expiresAt;
+  }
+
+  private async createRefreshSession(userId: string) {
+    const refreshToken = this.generateRefreshToken();
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + this.refreshAbsoluteTtlMs);
+
+    const session = this.refreshSessionsRepository.create({
+      userId,
+      tokenHash: this.hashRefreshToken(refreshToken),
+      lastActivityAt: now,
+      expiresAt,
+      revokedAt: null,
+    });
+
+    const savedSession = await this.refreshSessionsRepository.save(session);
+
+    return {
+      session: savedSession,
+      refreshToken,
+    };
+  }
+
+  private async signAccessToken(user: User, sessionId: string) {
+    return this.jwtService.signAsync(
+      {
+        sub: user.id,
+        sid: sessionId,
+        role: user.role,
+        domainId: user.domainId,
+        email: user.email,
+      },
+      {
+        expiresIn: this.accessTokenTtl as any,
+      },
+    );
+  }
+
+  private generateRefreshToken() {
+    return randomBytes(64).toString('base64url');
+  }
+
+  private hashRefreshToken(refreshToken: string) {
+    return createHash('sha256').update(refreshToken).digest('hex');
+  }
+
+  private async revokeSession(session: RefreshSession, revokedAt: Date) {
+    session.revokedAt = revokedAt;
+    await this.refreshSessionsRepository.save(session);
   }
 
   private toSafeUser(user: User) {

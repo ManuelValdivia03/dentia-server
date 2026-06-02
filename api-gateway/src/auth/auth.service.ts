@@ -101,8 +101,32 @@ export class AuthService {
   }
 
   login(dto: LoginDto) {
-    return this.forwardRequest(() =>
+    return this.forwardRequestWithCookies(() =>
       this.httpService.post(`${this.authServiceBaseUrl}/auth/login`, dto),
+    );
+  }
+
+  refresh(cookieHeader?: string) {
+    return this.forwardRequestWithCookies(() =>
+      this.httpService.post(
+        `${this.authServiceBaseUrl}/auth/refresh`,
+        {},
+        {
+          headers: cookieHeader ? { Cookie: cookieHeader } : undefined,
+        },
+      ),
+    );
+  }
+
+  logout(cookieHeader?: string) {
+    return this.forwardRequestWithCookies(() =>
+      this.httpService.post(
+        `${this.authServiceBaseUrl}/auth/logout`,
+        {},
+        {
+          headers: cookieHeader ? { Cookie: cookieHeader } : undefined,
+        },
+      ),
     );
   }
 
@@ -132,6 +156,30 @@ export class AuthService {
     try {
       const response = await firstValueFrom(request());
       return response.data;
+    } catch (error) {
+      const axiosError = error as AxiosError;
+
+      if (axiosError.response) {
+        throw new HttpException(
+          axiosError.response.data ?? 'Error en auth-service',
+          axiosError.response.status,
+        );
+      }
+
+      throw new HttpException('No se pudo conectar con auth-service', 503);
+    }
+  }
+
+  private async forwardRequestWithCookies<T>(
+    request: () => Observable<AxiosResponse<T>>,
+  ): Promise<{ data: T; setCookie?: string[] }> {
+    try {
+      const response = await firstValueFrom(request());
+
+      return {
+        data: response.data,
+        setCookie: response.headers['set-cookie'],
+      };
     } catch (error) {
       const axiosError = error as AxiosError;
 

@@ -13,7 +13,7 @@ import { DentistsController } from '../dentists/dentists.controller';
     HttpModule,
     JwtModule.register({
       secret: process.env.JWT_SECRET ?? 'dentia-dev-secret',
-      signOptions: { expiresIn: '1d' },
+      signOptions: { expiresIn: (process.env.ACCESS_TOKEN_TTL || '2m') as any },
     }),
   ],
   controllers: [AuthController, UsersController, DentistsController],

@@ -4,9 +4,12 @@ import {
   HttpCode,
   HttpStatus,
   Post,
+  Req,
+  Res,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
+import type { Request, Response } from 'express';
 import {
   ApiBadRequestResponse,
   ApiBody,
@@ -26,9 +29,18 @@ import { RegisterDto } from './dto/register.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
 import { ResendVerificationCodeDto } from './dto/resend-verification-code.dto';
 
+function getEnvNumber(name: string, fallback: number) {
+  const value = process.env[name];
+  const parsed = Number(value);
+
+  return value && Number.isFinite(parsed) ? parsed : fallback;
+}
+
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
+  private readonly refreshCookieName = 'dentia_refresh_token';
+
   constructor(private readonly authService: AuthService) {}
 
   @Post('register')
@@ -121,7 +133,80 @@ export class AuthController {
   @ApiOkResponse({ description: 'Login exitoso' })
   @ApiUnauthorizedResponse({ description: 'Credenciales inválidas' })
   @ApiBadRequestResponse({ description: 'Datos inválidos' })
-  login(@Body() dto: LoginDto) {
-    return this.authService.login(dto);
+  async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
+    const result = await this.authService.login(dto);
+
+    this.setRefreshCookie(res, result.refreshToken);
+
+    return {
+      accessToken: result.accessToken,
+      user: result.user,
+    };
+  }
+
+  @Post('refresh')
+  @HttpCode(HttpStatus.OK)
+  async refresh(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.authService.refresh(
+      this.getRefreshTokenFromRequest(req),
+    );
+
+    this.setRefreshCookie(res, result.refreshToken);
+
+    return {
+      accessToken: result.accessToken,
+      user: result.user,
+    };
+  }
+
+  @Post('logout')
+  @HttpCode(HttpStatus.OK)
+  async logout(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.authService.logout(
+      this.getRefreshTokenFromRequest(req),
+    );
+
+    this.clearRefreshCookie(res);
+
+    return result;
+  }
+
+  private setRefreshCookie(res: Response, refreshToken: string) {
+    res.cookie(this.refreshCookieName, refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/auth',
+      maxAge: getEnvNumber('REFRESH_TOKEN_ABSOLUTE_TTL_SECONDS', 28800) * 1000,
+    });
+  }
+
+  private clearRefreshCookie(res: Response) {
+    res.clearCookie(this.refreshCookieName, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/auth',
+    });
+  }
+
+  private getRefreshTokenFromRequest(req: Request) {
+    const cookieHeader = req.headers.cookie;
+
+    if (!cookieHeader) {
+      return undefined;
+    }
+
+    return cookieHeader
+      .split(';')
+      .map((cookie) => cookie.trim())
+      .find((cookie) => cookie.startsWith(`${this.refreshCookieName}=`))
+      ?.slice(this.refreshCookieName.length + 1);
   }
 }

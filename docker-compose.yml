@@ -52,6 +52,9 @@ services:
       DB_PASSWORD: ${POSTGRES_PASSWORD}
       DB_NAME: ${POSTGRES_AUTH_DB}
       JWT_SECRET: ${JWT_SECRET}
+      ACCESS_TOKEN_TTL: ${ACCESS_TOKEN_TTL:-2m}
+      REFRESH_TOKEN_IDLE_TIMEOUT_SECONDS: ${REFRESH_TOKEN_IDLE_TIMEOUT_SECONDS:-300}
+      REFRESH_TOKEN_ABSOLUTE_TTL_SECONDS: ${REFRESH_TOKEN_ABSOLUTE_TTL_SECONDS:-28800}
       SMTP_HOST: ${SMTP_HOST}
       SMTP_PORT: ${SMTP_PORT}
       SMTP_USER: ${SMTP_USER}
@@ -240,6 +243,7 @@ services:
       REPORTS_SERVICE_URL: http://reports-service:3006
       INTERNAL_API_KEY: dev-internal-key
       JWT_SECRET: ${JWT_SECRET}
+      ACCESS_TOKEN_TTL: ${ACCESS_TOKEN_TTL:-2m}
     depends_on:
       - auth-service
       - appointments-service

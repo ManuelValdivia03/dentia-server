@@ -1,7 +1,10 @@
 import { HttpService } from '@nestjs/axios';
 import { HttpException } from '@nestjs/common';
+import axios from 'axios';
 import { of, throwError } from 'rxjs';
 import { AuthService } from './auth.service';
+
+jest.mock('axios');
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -14,6 +17,7 @@ describe('AuthService', () => {
     } as any;
 
     service = new AuthService(httpService);
+    jest.clearAllMocks();
   });
 
   it('should be defined', () => {
@@ -39,18 +43,20 @@ describe('AuthService', () => {
       },
     };
 
-    httpService.post.mockReturnValueOnce(
-      of({
-        data: responseData,
-      } as any),
-    );
+    (axios.post as jest.Mock).mockResolvedValueOnce({
+      data: responseData,
+    });
 
     const result = await service.register(dto);
 
     expect(result).toEqual(responseData);
-    expect(httpService.post).toHaveBeenCalledWith(
+    expect(axios.post).toHaveBeenCalledWith(
       'http://localhost:3001/auth/register',
-      dto,
+      expect.anything(),
+      expect.objectContaining({
+        headers: expect.any(Object),
+        maxBodyLength: Infinity,
+      }),
     );
   });
 
@@ -130,12 +136,18 @@ describe('AuthService', () => {
     httpService.post.mockReturnValueOnce(
       of({
         data: responseData,
+        headers: {
+          'set-cookie': ['dentia_refresh_token=refresh-token'],
+        },
       } as any),
     );
 
     const result = await service.login(dto);
 
-    expect(result).toEqual(responseData);
+    expect(result).toEqual({
+      data: responseData,
+      setCookie: ['dentia_refresh_token=refresh-token'],
+    });
     expect(httpService.post).toHaveBeenCalledWith(
       'http://localhost:3001/auth/login',
       dto,

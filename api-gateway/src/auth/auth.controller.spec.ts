@@ -11,6 +11,8 @@ describe('AuthController', () => {
       verifyEmail: jest.fn(),
       resendVerificationCode: jest.fn(),
       login: jest.fn(),
+      refresh: jest.fn(),
+      logout: jest.fn(),
     } as any;
 
     controller = new AuthController(service);
@@ -43,7 +45,7 @@ describe('AuthController', () => {
 
     const result = await controller.register(dto as any);
 
-    expect(service.register).toHaveBeenCalledWith(dto);
+    expect(service.register).toHaveBeenCalledWith(dto, undefined);
     expect(result).toEqual(expected);
   });
 
@@ -106,11 +108,20 @@ describe('AuthController', () => {
       },
     };
 
-    service.login.mockResolvedValueOnce(expected as any);
+    service.login.mockResolvedValueOnce({
+      data: expected,
+      setCookie: ['dentia_refresh_token=refresh-token; HttpOnly; Path=/auth'],
+    } as any);
+    const response = {
+      setHeader: jest.fn(),
+    };
 
-    const result = await controller.login(dto as any);
+    const result = await controller.login(dto as any, response as any);
 
     expect(service.login).toHaveBeenCalledWith(dto);
+    expect(response.setHeader).toHaveBeenCalledWith('Set-Cookie', [
+      'dentia_refresh_token=refresh-token; HttpOnly; Path=/auth',
+    ]);
     expect(result).toEqual(expected);
   });
 });

@@ -4,9 +4,12 @@ import {
   HttpCode,
   HttpStatus,
   Post,
+  Req,
+  Res,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
+import type { Request, Response } from 'express';
 import {
   ApiBadRequestResponse,
   ApiBody,
@@ -130,7 +133,48 @@ export class AuthController {
   @ApiUnauthorizedResponse({ description: 'Credenciales inválidas.' })
   @ApiBadRequestResponse({ description: 'Datos inválidos.' })
   @ApiServiceUnavailableResponse({ description: 'auth-service no disponible.' })
-  login(@Body() dto: LoginDto) {
-    return this.authService.login(dto);
+  async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
+    const result = await this.authService.login(dto);
+
+    this.forwardSetCookie(res, result.setCookie);
+
+    return result.data;
+  }
+
+  @Post('refresh')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Renovar sesion activa' })
+  @ApiOkResponse({ description: 'Sesion renovada correctamente.' })
+  @ApiUnauthorizedResponse({ description: 'Sesion expirada o invalida.' })
+  async refresh(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.authService.refresh(req.headers.cookie);
+
+    this.forwardSetCookie(res, result.setCookie);
+
+    return result.data;
+  }
+
+  @Post('logout')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Cerrar sesion' })
+  @ApiOkResponse({ description: 'Sesion cerrada correctamente.' })
+  async logout(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.authService.logout(req.headers.cookie);
+
+    this.forwardSetCookie(res, result.setCookie);
+
+    return result.data;
+  }
+
+  private forwardSetCookie(res: Response, setCookie?: string[]) {
+    if (setCookie?.length) {
+      res.setHeader('Set-Cookie', setCookie);
+    }
   }
 }

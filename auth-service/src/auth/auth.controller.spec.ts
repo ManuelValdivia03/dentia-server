@@ -11,6 +11,8 @@ describe('AuthController', () => {
       verifyEmail: jest.fn(),
       resendVerificationCode: jest.fn(),
       login: jest.fn(),
+      refresh: jest.fn(),
+      logout: jest.fn(),
     } as any;
 
     controller = new AuthController(service);
@@ -43,7 +45,7 @@ describe('AuthController', () => {
 
     const result = await controller.register(dto as any);
 
-    expect(service.registerPatient).toHaveBeenCalledWith(dto);
+    expect(service.registerPatient).toHaveBeenCalledWith(dto, undefined);
     expect(result).toEqual(expected);
   });
 
@@ -97,6 +99,7 @@ describe('AuthController', () => {
 
     const expected = {
       accessToken: 'jwt-token',
+      refreshToken: 'refresh-token',
       user: {
         id: 'u1',
         email: dto.email,
@@ -107,10 +110,24 @@ describe('AuthController', () => {
     };
 
     service.login.mockResolvedValueOnce(expected as any);
+    const response = {
+      cookie: jest.fn(),
+    };
 
-    const result = await controller.login(dto as any);
+    const result = await controller.login(dto as any, response as any);
 
     expect(service.login).toHaveBeenCalledWith(dto);
-    expect(result).toEqual(expected);
+    expect(response.cookie).toHaveBeenCalledWith(
+      'dentia_refresh_token',
+      'refresh-token',
+      expect.objectContaining({
+        httpOnly: true,
+        path: '/auth',
+      }),
+    );
+    expect(result).toEqual({
+      accessToken: expected.accessToken,
+      user: expected.user,
+    });
   });
 });

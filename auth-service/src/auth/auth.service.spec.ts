@@ -15,6 +15,7 @@ import { MailService } from '../mail/mail.service';
 describe('AuthService', () => {
   let service: AuthService;
   let usersRepository: any;
+  let refreshSessionsRepository: any;
   let jwtService: jest.Mocked<JwtService>;
   let mailService: jest.Mocked<MailService>;
 
@@ -27,6 +28,12 @@ describe('AuthService', () => {
       find: jest.fn(),
     };
 
+    refreshSessionsRepository = {
+      create: jest.fn(),
+      save: jest.fn(),
+      findOne: jest.fn(),
+    };
+
     jwtService = {
       signAsync: jest.fn(),
     } as any;
@@ -35,7 +42,12 @@ describe('AuthService', () => {
       sendVerificationCode: jest.fn(),
     } as any;
 
-    service = new AuthService(usersRepository, jwtService, mailService);
+    service = new AuthService(
+      usersRepository,
+      refreshSessionsRepository,
+      jwtService,
+      mailService,
+    );
 
     jest.clearAllMocks();
   });
@@ -198,8 +210,20 @@ describe('AuthService', () => {
       password: 'Password123*',
       fullName: 'Dra. Nueva',
       role: 'DENTIST' as const,
+      cedulaProfesional: '12345678',
+      escuela: 'Universidad Nacional',
+      descripcion: 'OdontologÃ­a general',
     };
+    const photo = {
+      buffer: Buffer.from([
+        0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00,
+        0x00,
+      ]),
+      mimetype: 'image/png',
+      size: 12,
+    } as Express.Multer.File;
 
+    usersRepository.findOne.mockResolvedValueOnce(null);
     usersRepository.findOne.mockResolvedValueOnce(null);
 
     (bcrypt.hash as jest.Mock).mockImplementation(
@@ -213,7 +237,7 @@ describe('AuthService', () => {
 
     usersRepository.save.mockImplementation(async (user: any) => user);
 
-    const result = await service.registerPatient(dto);
+    const result = await service.registerPatient(dto, photo);
 
     expect(usersRepository.create).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -266,6 +290,14 @@ describe('AuthService', () => {
 
     usersRepository.findOne.mockResolvedValueOnce(user);
     (bcrypt.compare as jest.Mock).mockResolvedValueOnce(true);
+    refreshSessionsRepository.create.mockImplementation((data: any) => ({
+      id: 'session-1',
+      ...data,
+    }));
+    refreshSessionsRepository.save.mockImplementation(async (session: any) => ({
+      id: 'session-1',
+      ...session,
+    }));
     jwtService.signAsync.mockResolvedValueOnce('jwt-token');
 
     const result = await service.login(dto);
@@ -274,24 +306,29 @@ describe('AuthService', () => {
       where: { email: dto.email, isActive: true },
     });
 
-    expect(jwtService.signAsync).toHaveBeenCalledWith({
-      sub: 'u1',
-      role: UserRole.PATIENT,
-      domainId: 'p1',
-      email: dto.email,
-    });
+    expect(jwtService.signAsync).toHaveBeenCalledWith(
+      {
+        sub: 'u1',
+        sid: 'session-1',
+        role: UserRole.PATIENT,
+        domainId: 'p1',
+        email: dto.email,
+      },
+      {
+        expiresIn: '2m',
+      },
+    );
 
     expect(result).toEqual({
       accessToken: 'jwt-token',
-      user: {
+      refreshToken: expect.any(String),
+      user: expect.objectContaining({
         id: 'u1',
         email: dto.email,
         role: UserRole.PATIENT,
         domainId: 'p1',
-        fullName: undefined,
-        specialty: undefined,
         emailVerified: true,
-      },
+      }),
     });
   });
 
