@@ -7,6 +7,7 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
 import { UsersController } from '../users/users.controller';
 import { DentistsController } from '../dentists/dentists.controller';
+import { ProfilePhotosController } from '../dentists/profile-photos.controller';
 
 @Module({
   imports: [
@@ -16,7 +17,12 @@ import { DentistsController } from '../dentists/dentists.controller';
       signOptions: { expiresIn: (process.env.ACCESS_TOKEN_TTL || '2m') as any },
     }),
   ],
-  controllers: [AuthController, UsersController, DentistsController],
+  controllers: [
+    AuthController,
+    UsersController,
+    DentistsController,
+    ProfilePhotosController,
+  ],
   providers: [AuthService, JwtAuthGuard, RolesGuard],
   exports: [AuthService, JwtAuthGuard, RolesGuard, JwtModule],
 })

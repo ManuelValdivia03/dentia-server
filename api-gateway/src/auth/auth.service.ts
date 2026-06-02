@@ -58,9 +58,13 @@ export class AuthService {
   }
 
   async getDentistPhoto(domainId: string) {
+    return this.getProfilePhoto(domainId, `/dentists/${domainId}/photo`);
+  }
+
+  async getProfilePhoto(domainId: string, path?: string) {
     try {
       const response = await axios.get(
-        `${this.authServiceBaseUrl}/dentists/${domainId}/photo`,
+        `${this.authServiceBaseUrl}${path ?? `/profile-photos/${domainId}`}`,
         { responseType: 'stream' },
       );
 

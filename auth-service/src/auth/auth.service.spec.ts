@@ -136,6 +136,7 @@ describe('AuthService', () => {
     usersRepository.findOne.mockResolvedValueOnce({
       id: 'u1',
       email: 'nuevo@dentia.local',
+      emailVerified: true,
     });
 
     await expect(
@@ -145,6 +146,56 @@ describe('AuthService', () => {
         fullName: 'Paciente Nuevo',
       }),
     ).rejects.toThrow(ConflictException);
+  });
+
+  it('registerPatient debe reenviar codigo si el correo existe sin verificar', async () => {
+    const existingUser = {
+      id: 'u1',
+      email: 'nuevo@dentia.local',
+      role: UserRole.PATIENT,
+      domainId: 'p1',
+      isActive: true,
+      emailVerified: false,
+      emailVerificationCodeHash: 'old-hash',
+      emailVerificationExpiresAt: new Date(Date.now() - 1000),
+      emailVerificationAttempts: 3,
+      emailVerificationLastSentAt: new Date(Date.now() - 1000),
+      fullName: 'Paciente Nuevo',
+    };
+
+    usersRepository.findOne.mockResolvedValueOnce(existingUser);
+    usersRepository.save.mockImplementation(async (user: any) => user);
+    (bcrypt.hash as jest.Mock).mockImplementation(
+      async (value: string) => `hash-${value}`,
+    );
+
+    const result = await service.registerPatient({
+      email: 'nuevo@dentia.local',
+      password: 'Password123*',
+      fullName: 'Paciente Nuevo',
+    });
+
+    expect(existingUser.emailVerificationCodeHash).toEqual(
+      expect.stringMatching(/^hash-\d{6}$/),
+    );
+    expect(existingUser.emailVerificationExpiresAt).toBeInstanceOf(Date);
+    expect(existingUser.emailVerificationAttempts).toBe(0);
+    expect(existingUser.emailVerificationLastSentAt).toBeInstanceOf(Date);
+    expect(usersRepository.save).toHaveBeenCalledWith(existingUser);
+    expect(mailService.sendVerificationCode).toHaveBeenCalledWith(
+      existingUser.email,
+      expect.stringMatching(/^\d{6}$/),
+    );
+    expect(result).toEqual({
+      message:
+        'Ya habia un registro pendiente. Te enviamos un nuevo codigo de verificacion.',
+      user: expect.objectContaining({
+        id: 'u1',
+        email: existingUser.email,
+        emailVerified: false,
+      }),
+      requiresEmailVerification: true,
+    });
   });
 
   it('registerPatient debe crear usuario no verificado y enviar código', async () => {
@@ -202,6 +253,43 @@ describe('AuthService', () => {
         emailVerified: false,
       }),
     });
+  });
+
+  it('registerPatient debe permitir foto opcional en paciente', async () => {
+    const dto = {
+      email: 'foto@dentia.local',
+      password: 'Password123*',
+      fullName: 'Paciente Foto',
+    };
+    const photo = {
+      buffer: Buffer.from([
+        0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00,
+        0x00,
+      ]),
+      mimetype: 'image/png',
+      size: 12,
+    } as Express.Multer.File;
+
+    usersRepository.findOne.mockResolvedValueOnce(null);
+    (bcrypt.hash as jest.Mock).mockImplementation(
+      async (value: string) => `hash-${value}`,
+    );
+    usersRepository.create.mockImplementation((data: any) => ({
+      id: 'u-photo',
+      ...data,
+    }));
+    usersRepository.save.mockImplementation(async (user: any) => user);
+
+    await service.registerPatient(dto, photo);
+
+    expect(usersRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        email: dto.email,
+        role: UserRole.PATIENT,
+        profilePhoto: photo.buffer,
+        profilePhotoContentType: photo.mimetype,
+      }),
+    );
   });
 
     it('registerPatient debe crear dentista no verificado si role es DENTIST', async () => {
@@ -448,7 +536,7 @@ describe('AuthService', () => {
 
     expect(result).toEqual({
       message: 'Correo verificado correctamente',
-      user: {
+      user: expect.objectContaining({
         id: 'u1',
         email: 'nuevo@dentia.local',
         role: UserRole.PATIENT,
@@ -456,7 +544,7 @@ describe('AuthService', () => {
         fullName: 'Paciente Nuevo',
         specialty: undefined,
         emailVerified: true,
-      },
+      }),
     });
   });
 

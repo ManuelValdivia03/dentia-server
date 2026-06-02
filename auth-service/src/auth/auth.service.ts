@@ -120,6 +120,10 @@ export class AuthService implements OnModuleInit {
     });
 
     if (existingUser) {
+      if (!existingUser.emailVerified) {
+        return this.restartEmailVerification(existingUser);
+      }
+
       throw new ConflictException('Ya existe un usuario con ese correo');
     }
 
@@ -135,8 +139,6 @@ export class AuthService implements OnModuleInit {
         );
       }
 
-      this.assertValidProfilePhoto(photo);
-
       const cedulaTaken = await this.usersRepository.findOne({
         where: {
           role: UserRole.DENTIST,
@@ -150,6 +152,8 @@ export class AuthService implements OnModuleInit {
         );
       }
     }
+
+    this.assertValidProfilePhoto(photo, role === UserRole.DENTIST);
 
     const passwordHash = await bcrypt.hash(dto.password, 10);
     const verificationCode = this.generateVerificationCode();
@@ -166,9 +170,8 @@ export class AuthService implements OnModuleInit {
         role === UserRole.DENTIST ? dto.cedulaProfesional : undefined,
       escuela: role === UserRole.DENTIST ? dto.escuela : undefined,
       descripcion: role === UserRole.DENTIST ? dto.descripcion : undefined,
-      profilePhoto: role === UserRole.DENTIST ? photo!.buffer : undefined,
-      profilePhotoContentType:
-        role === UserRole.DENTIST ? photo!.mimetype : undefined,
+      profilePhoto: photo?.buffer,
+      profilePhotoContentType: photo?.mimetype,
       isActive: true,
       emailVerified: false,
       emailVerificationCodeHash: verificationCodeHash,
@@ -321,9 +324,11 @@ export class AuthService implements OnModuleInit {
     }
 
     if (!user.emailVerified) {
-      throw new UnauthorizedException(
-        'Debes verificar tu correo antes de iniciar sesión',
-      );
+      throw new UnauthorizedException({
+        message: 'Debes verificar tu correo antes de iniciar sesion',
+        requiresEmailVerification: true,
+        email: user.email,
+      });
     }
 
     const { session, refreshToken } = await this.createRefreshSession(user.id);
@@ -441,21 +446,29 @@ export class AuthService implements OnModuleInit {
   }
 
   async getDentistPhoto(domainId: string) {
-    const dentist = await this.usersRepository
+    return this.getProfilePhoto(domainId, UserRole.DENTIST);
+  }
+
+  async getProfilePhoto(domainId: string, role?: UserRole) {
+    const query = this.usersRepository
       .createQueryBuilder('user')
       .addSelect('user.profilePhoto')
       .where('user.domainId = :domainId', { domainId })
-      .andWhere('user.role = :role', { role: UserRole.DENTIST })
-      .andWhere('user.isActive = :isActive', { isActive: true })
-      .getOne();
+      .andWhere('user.isActive = :isActive', { isActive: true });
 
-    if (!dentist || !dentist.profilePhoto) {
+    if (role) {
+      query.andWhere('user.role = :role', { role });
+    }
+
+    const user = await query.getOne();
+
+    if (!user || !user.profilePhoto) {
       throw new NotFoundException('Foto de perfil no encontrada');
     }
 
     return {
-      buffer: dentist.profilePhoto,
-      contentType: dentist.profilePhotoContentType ?? 'application/octet-stream',
+      buffer: user.profilePhoto,
+      contentType: user.profilePhotoContentType ?? 'application/octet-stream',
     };
   }
 
@@ -469,6 +482,29 @@ export class AuthService implements OnModuleInit {
       expiresAt.getMinutes() + this.verificationTtlMinutes,
     );
     return expiresAt;
+  }
+
+  private async restartEmailVerification(user: User) {
+    const verificationCode = this.generateVerificationCode();
+
+    user.emailVerificationCodeHash = await bcrypt.hash(verificationCode, 10);
+    user.emailVerificationExpiresAt = this.getVerificationExpirationDate();
+    user.emailVerificationAttempts = 0;
+    user.emailVerificationLastSentAt = new Date();
+
+    const savedUser = await this.usersRepository.save(user);
+
+    await this.mailService.sendVerificationCode(
+      savedUser.email,
+      verificationCode,
+    );
+
+    return {
+      message:
+        'Ya habia un registro pendiente. Te enviamos un nuevo codigo de verificacion.',
+      user: this.toSafeUser(savedUser),
+      requiresEmailVerification: true,
+    };
   }
 
   private async createRefreshSession(userId: string) {
@@ -533,7 +569,7 @@ export class AuthService implements OnModuleInit {
       cedulaProfesional: isDentist ? user.cedulaProfesional : undefined,
       escuela: isDentist ? user.escuela : undefined,
       descripcion: isDentist ? user.descripcion : undefined,
-      photoUrl: isDentist ? this.buildPhotoUrl(user) : undefined,
+      photoUrl: this.buildPhotoUrl(user),
       emailVerified: user.emailVerified,
     };
   }
@@ -554,13 +590,20 @@ export class AuthService implements OnModuleInit {
 
   private buildPhotoUrl(user: User) {
     return user.profilePhotoContentType
-      ? `/dentists/${user.domainId}/photo`
+      ? `/profile-photos/${user.domainId}`
       : null;
   }
 
-  private assertValidProfilePhoto(photo?: Express.Multer.File) {
+  private assertValidProfilePhoto(
+    photo?: Express.Multer.File,
+    required = false,
+  ) {
     if (!photo || !photo.buffer || photo.size === 0) {
-      throw new BadRequestException('La foto de perfil es obligatoria');
+      if (required) {
+        throw new BadRequestException('La foto de perfil es obligatoria');
+      }
+
+      return;
     }
 
     const allowed = ['image/jpeg', 'image/png', 'image/webp'];

@@ -8,6 +8,7 @@ import { RefreshSession } from './entities/refresh-session.entity';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { UsersController } from '../users/users.controller';
 import { DentistsController } from '../users/dentists.controller';
+import { ProfilePhotosController } from '../users/profile-photos.controller';
 import { MailService } from '../mail/mail.service';
 
 @Module({
@@ -18,7 +19,12 @@ import { MailService } from '../mail/mail.service';
       signOptions: { expiresIn: (process.env.ACCESS_TOKEN_TTL || '2m') as any },
     }),
   ],
-  controllers: [AuthController, UsersController, DentistsController],
+  controllers: [
+    AuthController,
+    UsersController,
+    DentistsController,
+    ProfilePhotosController,
+  ],
   providers: [AuthService, JwtAuthGuard, MailService],
 })
 export class AuthModule {}
