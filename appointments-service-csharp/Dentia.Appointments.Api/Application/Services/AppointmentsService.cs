@@ -177,6 +177,8 @@ public class AppointmentsService : IAppointmentsService
 
         appointment.StartAt = startAt;
         appointment.EndAt = endAt;
+        appointment.Reason = dto.Reason;
+        appointment.Notes = dto.Notes;
         appointment.UpdatedAt = ToDbTimestamp(DateTime.UtcNow);
 
         await _db.SaveChangesAsync();
@@ -239,6 +241,11 @@ public class AppointmentsService : IAppointmentsService
         if (appointment.Status == AppointmentStatus.CANCELLED)
         {
             throw new AppException(StatusCodes.Status400BadRequest, "Cancelled appointments cannot be completed");
+        }
+
+        if (appointment.StartAt > ToDbTimestamp(DateTime.UtcNow))
+        {
+            throw new AppException(StatusCodes.Status400BadRequest, "Appointment cannot be completed before its start time");
         }
 
         appointment.Status = AppointmentStatus.COMPLETED;

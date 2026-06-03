@@ -200,6 +200,45 @@ public class AppointmentsServiceTests
     }
 
     [Fact]
+    public async Task RescheduleAsync_ShouldUpdateReasonAndNotes()
+    {
+        await using var db = CreateDbContext();
+
+        var appointmentId = Guid.NewGuid();
+
+        db.Appointments.Add(new Appointment
+        {
+            Id = appointmentId,
+            PatientId = "p1",
+            DentistId = "d1",
+            StartAt = FutureDate(9),
+            EndAt = FutureDate(9, 11),
+            Reason = "Consulta",
+            Notes = "Notas anteriores",
+            Status = AppointmentStatus.PENDING
+        });
+
+        await db.SaveChangesAsync();
+
+        var service = CreateService(db);
+
+        var result = await service.RescheduleAsync(
+            appointmentId,
+            new RescheduleAppointmentDto
+            {
+                StartAt = FutureDate(10),
+                EndAt = FutureDate(10, 11),
+                Reason = "Limpieza",
+                Notes = "Nuevas notas"
+            },
+            Patient("p1")
+        );
+
+        Assert.Equal("Limpieza", result.Reason);
+        Assert.Equal("Nuevas notas", result.Notes);
+    }
+
+    [Fact]
     public async Task FindAllAsync_ShouldReturnOnlyPatientAppointments_WhenRequesterIsPatient()
     {
         await using var db = CreateDbContext();
@@ -343,6 +382,35 @@ public class AppointmentsServiceTests
         );
 
         Assert.Equal(403, ex.StatusCode);
+    }
+
+    [Fact]
+    public async Task CompleteAsync_ShouldThrow400_WhenAppointmentHasNotStarted()
+    {
+        await using var db = CreateDbContext();
+
+        var appointmentId = Guid.NewGuid();
+
+        db.Appointments.Add(new Appointment
+        {
+            Id = appointmentId,
+            PatientId = "p1",
+            DentistId = "d1",
+            StartAt = FutureDate(1),
+            EndAt = FutureDate(1, 11),
+            Status = AppointmentStatus.CONFIRMED
+        });
+
+        await db.SaveChangesAsync();
+
+        var service = CreateService(db);
+
+        var ex = await Assert.ThrowsAsync<AppException>(() =>
+            service.CompleteAsync(appointmentId, Dentist("d1"))
+        );
+
+        Assert.Equal(400, ex.StatusCode);
+        Assert.Equal("Appointment cannot be completed before its start time", ex.Message);
     }
 
     private class FakeReportsClient : IReportsClient

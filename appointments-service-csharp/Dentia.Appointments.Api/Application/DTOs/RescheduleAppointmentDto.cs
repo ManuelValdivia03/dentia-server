@@ -9,4 +9,8 @@ public class RescheduleAppointmentDto
 
     [Required]
     public DateTime EndAt { get; set; }
+
+    public string? Reason { get; set; }
+
+    public string? Notes { get; set; }
 }
