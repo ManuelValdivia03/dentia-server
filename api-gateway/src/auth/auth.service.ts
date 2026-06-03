@@ -244,6 +244,14 @@ export class AuthService {
     );
   }
 
+  findUserByDomainId(domainId: string, authHeader: string) {
+    return this.forwardRequest(() =>
+      this.httpService.get(`${this.authServiceBaseUrl}/users/${domainId}`, {
+        headers: { Authorization: authHeader },
+      }),
+    );
+  }
+
   private async forwardRequest<T>(
     request: () => Observable<AxiosResponse<T>>,
   ): Promise<T> {

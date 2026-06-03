@@ -738,6 +738,18 @@ export class AuthService implements OnModuleInit {
     return this.toDentistView(dentist);
   }
 
+  async findUserByDomainId(domainId: string) {
+    const user = await this.usersRepository.findOne({
+      where: { domainId, isActive: true },
+    });
+
+    if (!user) {
+      throw new NotFoundException('Usuario no encontrado');
+    }
+
+    return this.toSafeUser(user);
+  }
+
   async getDentistPhoto(domainId: string) {
     return this.getProfilePhoto(domainId, UserRole.DENTIST);
   }

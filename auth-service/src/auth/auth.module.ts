@@ -9,6 +9,7 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { UsersController } from '../users/users.controller';
 import { DentistsController } from '../users/dentists.controller';
 import { ProfilePhotosController } from '../users/profile-photos.controller';
+import { UserLookupController } from '../users/user-lookup.controller';
 import { MailService } from '../mail/mail.service';
 import { RateLimitGuard } from './rate-limit.guard';
 
@@ -25,6 +26,7 @@ import { RateLimitGuard } from './rate-limit.guard';
     UsersController,
     DentistsController,
     ProfilePhotosController,
+    UserLookupController,
   ],
   providers: [AuthService, JwtAuthGuard, MailService, RateLimitGuard],
 })

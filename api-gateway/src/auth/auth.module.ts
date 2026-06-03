@@ -8,6 +8,7 @@ import { RolesGuard } from './guards/roles.guard';
 import { UsersController } from '../users/users.controller';
 import { DentistsController } from '../dentists/dentists.controller';
 import { ProfilePhotosController } from '../dentists/profile-photos.controller';
+import { UserLookupController } from '../users/user-lookup.controller';
 import { RateLimitGuard } from './rate-limit.guard';
 
 @Module({
@@ -23,6 +24,7 @@ import { RateLimitGuard } from './rate-limit.guard';
     UsersController,
     DentistsController,
     ProfilePhotosController,
+    UserLookupController,
   ],
   providers: [AuthService, JwtAuthGuard, RolesGuard, RateLimitGuard],
   exports: [AuthService, JwtAuthGuard, RolesGuard, JwtModule],
