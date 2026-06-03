@@ -3,6 +3,8 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { PrescriptionsModule } from './prescriptions/prescriptions.module';
 import { AppController } from './app.controller';
 
+const isProduction = process.env.NODE_ENV === 'production';
+
 @Module({
   imports: [
     PrescriptionsModule,
@@ -14,7 +16,7 @@ import { AppController } from './app.controller';
       password: process.env.DB_PASSWORD ?? 'dentia123',
       database: process.env.DB_NAME ?? 'dentia_prescriptions',
       autoLoadEntities: true,
-      synchronize: true,
+      synchronize: !isProduction,
     }),
   ],
   controllers: [AppController],

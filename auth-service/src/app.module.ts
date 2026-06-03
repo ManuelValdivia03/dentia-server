@@ -9,6 +9,8 @@ import { MetricsController } from './observability/metrics.controller';
 import { HttpObservabilityInterceptor } from './observability/http-observability.interceptor';
 import { MetricsService } from './observability/metrics.service';
 
+const isProduction = process.env.NODE_ENV === 'production';
+
 @Module({
   imports: [
     TypeOrmModule.forRoot({
@@ -19,7 +21,7 @@ import { MetricsService } from './observability/metrics.service';
       password: process.env.DB_PASSWORD ?? 'dentia123',
       database: process.env.DB_NAME ?? 'dentia_auth',
       entities: [User, RefreshSession],
-      synchronize: true,
+      synchronize: !isProduction,
     }),
     AuthModule,
   ],

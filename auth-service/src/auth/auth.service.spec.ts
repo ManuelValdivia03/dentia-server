@@ -72,6 +72,21 @@ describe('AuthService', () => {
     expect(usersRepository.save).not.toHaveBeenCalled();
   });
 
+  it('onModuleInit no debe sembrar usuarios demo en produccion', async () => {
+    const originalNodeEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
+
+    try {
+      await service.onModuleInit();
+
+      expect(usersRepository.count).not.toHaveBeenCalled();
+      expect(usersRepository.create).not.toHaveBeenCalled();
+      expect(usersRepository.save).not.toHaveBeenCalled();
+    } finally {
+      process.env.NODE_ENV = originalNodeEnv;
+    }
+  });
+
   it('onModuleInit debe sembrar 3 usuarios verificados si no existen', async () => {
     usersRepository.count.mockResolvedValueOnce(0);
     usersRepository.create.mockImplementation((data: any) => data);

@@ -56,6 +56,7 @@ curl http://localhost:3000/health
 ```
 
 El gateway revisa configuracion y dependencias HTTP: auth, appointments, prescriptions, chat, files y reports.
+Si alguna dependencia o variable critica falta, responde `503` con `status: "degraded"`.
 
 Auth Service:
 
@@ -64,6 +65,16 @@ curl http://localhost:3001/health
 ```
 
 Auth revisa base de datos, JWT y estado de configuracion de email.
+Si la base de datos no responde, devuelve `503` con `status: "degraded"`.
+
+## Produccion
+
+En `NODE_ENV=production`:
+
+- `auth-service` no crea usuarios demo aunque la base este vacia.
+- `auth-service` y `prescriptions-service` no ejecutan `synchronize` de TypeORM.
+
+Los cambios de esquema deben aplicarse de forma controlada antes del despliegue.
 
 ## Metricas
 

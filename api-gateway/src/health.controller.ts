@@ -1,4 +1,5 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, HttpStatus, Res } from '@nestjs/common';
+import type { Response } from 'express';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 type DependencyCheck = {
@@ -15,20 +16,26 @@ export class HealthController {
   @Get()
   @ApiOperation({ summary: 'Verificar estado del API Gateway' })
   @ApiOkResponse({ description: 'Gateway disponible.' })
-  async check() {
+  async check(@Res({ passthrough: true }) res: Response) {
     const dependencies = await this.checkDependencies();
-    const status = Object.values(dependencies).every(
-      (dependency) => dependency.status === 'ok',
-    )
-      ? 'ok'
-      : 'degraded';
+    const configuration = this.checkConfiguration();
+    const status =
+      Object.values(dependencies).every(
+        (dependency) => dependency.status === 'ok',
+      ) && configuration.status === 'ok'
+        ? 'ok'
+        : 'degraded';
+
+    if (status !== 'ok') {
+      res.status(HttpStatus.SERVICE_UNAVAILABLE);
+    }
 
     return {
       status,
       service: 'api-gateway',
       timestamp: new Date().toISOString(),
       checks: {
-        configuration: this.checkConfiguration(),
+        configuration,
         dependencies,
       },
     };

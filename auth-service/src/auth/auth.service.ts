@@ -95,6 +95,11 @@ export class AuthService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
+    if (process.env.NODE_ENV === 'production') {
+      this.logger.log('seed users skipped reason=production');
+      return;
+    }
+
     const usersCount = await this.usersRepository.count();
 
     if (usersCount > 0) {

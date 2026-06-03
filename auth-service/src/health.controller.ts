@@ -1,4 +1,5 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, HttpStatus, Res } from '@nestjs/common';
+import type { Response } from 'express';
 import { DataSource } from 'typeorm';
 
 @Controller('health')
@@ -6,10 +7,14 @@ export class HealthController {
   constructor(private readonly dataSource: DataSource) {}
 
   @Get()
-  async check() {
+  async check(@Res({ passthrough: true }) res: Response) {
     const database = await this.checkDatabase();
     const email = this.checkEmail();
     const status = database.status === 'ok' ? 'ok' : 'degraded';
+
+    if (status !== 'ok') {
+      res.status(HttpStatus.SERVICE_UNAVAILABLE);
+    }
 
     return {
       status,
