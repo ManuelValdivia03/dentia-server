@@ -2,6 +2,13 @@ import { HttpException, Injectable, Logger } from '@nestjs/common';
 import axios, { AxiosError } from 'axios';
 import { FilesService } from '../files/files.service';
 
+interface ChatConversation {
+  id?: string;
+  _id?: string;
+  patientId: string;
+  dentistId: string;
+}
+
 @Injectable()
 export class ChatService {
   private readonly logger = new Logger(ChatService.name);
@@ -58,9 +65,17 @@ export class ChatService {
         throw new HttpException('Authorization header is required', 401);
       }
 
+      const conversation = await this.findConversationForUser(
+        conversationId,
+        user,
+      );
+
       const uploaded = await this.filesService.upload(
         file,
-        body,
+        {
+          ...body,
+          patientId: conversation.patientId,
+        },
         authorization,
       );
 
@@ -100,6 +115,23 @@ export class ChatService {
       'x-user-id': user.domainId ?? user.sub ?? user.id,
       'x-user-role': user.role,
     };
+  }
+
+  private async findConversationForUser(
+    conversationId: string,
+    user: any,
+  ): Promise<ChatConversation> {
+    const conversations = await this.listConversations(user);
+    const conversation = conversations.find((item: ChatConversation) => {
+      const id = item.id ?? item._id;
+      return id === conversationId;
+    });
+
+    if (!conversation) {
+      throw new HttpException('Conversation not found', 404);
+    }
+
+    return conversation;
   }
 
   private async forward(requestFn: () => Promise<any>) {
