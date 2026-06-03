@@ -37,6 +37,10 @@ services:
       INTERNAL_API_KEY: ${INTERNAL_API_KEY}
       RABBITMQ_URL: ${RABBITMQ_URL}
 
+  notifications-service:
+    environment:
+      NODE_ENV: production
+
   prescriptions-service:
     ports: !reset []
     environment:

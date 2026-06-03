@@ -8,6 +8,9 @@ namespace Dentia.Appointments.Api.Application.Events;
 public interface IAppointmentEventsPublisher
 {
     Task PublishAppointmentCreatedAsync(Appointment appointment);
+    Task PublishAppointmentConfirmedAsync(Appointment appointment);
+    Task PublishAppointmentCancelledAsync(Appointment appointment);
+    Task PublishAppointmentRescheduledAsync(Appointment appointment);
 }
 
 public class AppointmentEventsPublisher : IAppointmentEventsPublisher
@@ -25,12 +28,33 @@ public class AppointmentEventsPublisher : IAppointmentEventsPublisher
 
     public async Task PublishAppointmentCreatedAsync(Appointment appointment)
     {
+        await PublishAppointmentEventAsync(AppointmentEventTypes.Created, appointment);
+    }
+
+    public async Task PublishAppointmentConfirmedAsync(Appointment appointment)
+    {
+        await PublishAppointmentEventAsync(AppointmentEventTypes.Confirmed, appointment);
+    }
+
+    public async Task PublishAppointmentCancelledAsync(Appointment appointment)
+    {
+        await PublishAppointmentEventAsync(AppointmentEventTypes.Cancelled, appointment);
+    }
+
+    public async Task PublishAppointmentRescheduledAsync(Appointment appointment)
+    {
+        await PublishAppointmentEventAsync(AppointmentEventTypes.Rescheduled, appointment);
+    }
+
+    private async Task PublishAppointmentEventAsync(string eventType, Appointment appointment)
+    {
         var rabbitMqUrl = _configuration["RABBITMQ_URL"];
 
         if (string.IsNullOrWhiteSpace(rabbitMqUrl))
         {
             _logger.LogWarning(
-                "RABBITMQ_URL is not configured. appointment.created was not published: {AppointmentId}",
+                "RABBITMQ_URL is not configured. {EventType} was not published: {AppointmentId}",
+                eventType,
                 appointment.Id
             );
 
@@ -60,6 +84,7 @@ public class AppointmentEventsPublisher : IAppointmentEventsPublisher
 
             var eventPayload = new AppointmentCreatedEvent
             {
+                Type = eventType,
                 Data = new AppointmentCreatedEventData
                 {
                     AppointmentId = appointment.Id.ToString(),
@@ -89,7 +114,8 @@ public class AppointmentEventsPublisher : IAppointmentEventsPublisher
             );
 
             _logger.LogInformation(
-                "appointment.created published to RabbitMQ: {AppointmentId}",
+                "{EventType} published to RabbitMQ: {AppointmentId}",
+                eventType,
                 appointment.Id
             );
         }
@@ -97,7 +123,8 @@ public class AppointmentEventsPublisher : IAppointmentEventsPublisher
         {
             _logger.LogWarning(
                 ex,
-                "RabbitMQ unavailable. appointment.created was not published: {AppointmentId}",
+                "RabbitMQ unavailable. {EventType} was not published: {AppointmentId}",
+                eventType,
                 appointment.Id
             );
         }

@@ -8,7 +8,7 @@ public class AppointmentCreatedEvent
     public string EventId { get; set; } = Guid.NewGuid().ToString();
 
     [JsonPropertyName("type")]
-    public string Type { get; set; } = "appointment.created";
+    public string Type { get; set; } = AppointmentEventTypes.Created;
 
     [JsonPropertyName("occurredAt")]
     public string OccurredAt { get; set; } = DateTime.UtcNow.ToString("O");
@@ -36,4 +36,12 @@ public class AppointmentCreatedEventData
 
     [JsonPropertyName("status")]
     public string Status { get; set; } = string.Empty;
+}
+
+public static class AppointmentEventTypes
+{
+    public const string Created = "appointment.created";
+    public const string Confirmed = "appointment.confirmed";
+    public const string Cancelled = "appointment.cancelled";
+    public const string Rescheduled = "appointment.rescheduled";
 }

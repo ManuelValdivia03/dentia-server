@@ -181,6 +181,7 @@ public class AppointmentsService : IAppointmentsService
 
         await _db.SaveChangesAsync();
         await _reportsClient.SendAppointmentSnapshotAsync(appointment);
+        await _eventsPublisher.PublishAppointmentRescheduledAsync(appointment);
 
         return appointment;
     }
@@ -196,6 +197,7 @@ public class AppointmentsService : IAppointmentsService
 
         await _db.SaveChangesAsync();
         await _reportsClient.SendAppointmentSnapshotAsync(appointment);
+        await _eventsPublisher.PublishAppointmentCancelledAsync(appointment);
         return appointment;
     }
 
@@ -219,6 +221,7 @@ public class AppointmentsService : IAppointmentsService
 
         await _db.SaveChangesAsync();
         await _reportsClient.SendAppointmentSnapshotAsync(appointment);
+        await _eventsPublisher.PublishAppointmentConfirmedAsync(appointment);
 
         return appointment;
     }

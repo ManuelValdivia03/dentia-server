@@ -359,10 +359,31 @@ public class AppointmentsServiceTests
     private class FakeAppointmentEventsPublisher : IAppointmentEventsPublisher
     {
         public List<Appointment> CreatedEvents { get; } = new();
+        public List<Appointment> ConfirmedEvents { get; } = new();
+        public List<Appointment> CancelledEvents { get; } = new();
+        public List<Appointment> RescheduledEvents { get; } = new();
 
         public Task PublishAppointmentCreatedAsync(Appointment appointment)
         {
             CreatedEvents.Add(appointment);
+            return Task.CompletedTask;
+        }
+
+        public Task PublishAppointmentConfirmedAsync(Appointment appointment)
+        {
+            ConfirmedEvents.Add(appointment);
+            return Task.CompletedTask;
+        }
+
+        public Task PublishAppointmentCancelledAsync(Appointment appointment)
+        {
+            CancelledEvents.Add(appointment);
+            return Task.CompletedTask;
+        }
+
+        public Task PublishAppointmentRescheduledAsync(Appointment appointment)
+        {
+            RescheduledEvents.Add(appointment);
             return Task.CompletedTask;
         }
     }
