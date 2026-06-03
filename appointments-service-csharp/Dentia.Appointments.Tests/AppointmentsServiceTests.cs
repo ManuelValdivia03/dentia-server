@@ -55,6 +55,11 @@ public class AppointmentsServiceTests
         };
     }
 
+    private static DateTime FutureDate(int daysFromNow, int hour = 10)
+    {
+        return DateTime.UtcNow.Date.AddDays(daysFromNow).AddHours(hour);
+    }
+
     private static AppointmentsService CreateService(
         AppointmentsDbContext db,
         FakeReportsClient? reportsClient = null,
@@ -79,8 +84,8 @@ public class AppointmentsServiceTests
         {
             PatientId = "p1",
             DentistId = "d1",
-            StartAt = DateTime.Parse("2026-05-01T10:00:00Z"),
-            EndAt = DateTime.Parse("2026-05-01T11:00:00Z"),
+            StartAt = FutureDate(7),
+            EndAt = FutureDate(7, 11),
             Reason = "Limpieza",
             Notes = "Prueba"
         };
@@ -107,8 +112,8 @@ public class AppointmentsServiceTests
             {
                 PatientId = "p1",
                 DentistId = "d1",
-                StartAt = DateTime.Parse("2026-05-02T10:00:00Z"),
-                EndAt = DateTime.Parse("2026-05-02T11:00:00Z"),
+                StartAt = FutureDate(8),
+                EndAt = FutureDate(8, 11),
                 Reason = "Primera cita"
             },
             Patient("p1")
@@ -120,8 +125,8 @@ public class AppointmentsServiceTests
                 {
                     PatientId = "p1",
                     DentistId = "d1",
-                    StartAt = DateTime.Parse("2026-05-02T10:30:00Z"),
-                    EndAt = DateTime.Parse("2026-05-02T11:30:00Z"),
+                    StartAt = FutureDate(8).AddMinutes(30),
+                    EndAt = FutureDate(8, 11).AddMinutes(30),
                     Reason = "Empalme"
                 },
                 Patient("p1")
@@ -130,6 +135,68 @@ public class AppointmentsServiceTests
 
         Assert.Equal(409, ex.StatusCode);
         Assert.Equal("Dentist already has an appointment in this time range", ex.Message);
+    }
+
+    [Fact]
+    public async Task CreateAsync_ShouldThrow400_WhenStartAtIsNotFuture()
+    {
+        await using var db = CreateDbContext();
+        var service = CreateService(db);
+
+        var ex = await Assert.ThrowsAsync<AppException>(() =>
+            service.CreateAsync(
+                new CreateAppointmentDto
+                {
+                    PatientId = "p1",
+                    DentistId = "d1",
+                    StartAt = DateTime.UtcNow.AddMinutes(-30),
+                    EndAt = DateTime.UtcNow.AddMinutes(30),
+                    Reason = "Fecha pasada"
+                },
+                Patient("p1")
+            )
+        );
+
+        Assert.Equal(400, ex.StatusCode);
+        Assert.Equal("startAt must be in the future", ex.Message);
+        Assert.Empty(db.Appointments);
+    }
+
+    [Fact]
+    public async Task RescheduleAsync_ShouldThrow400_WhenStartAtIsNotFuture()
+    {
+        await using var db = CreateDbContext();
+
+        var appointmentId = Guid.NewGuid();
+
+        db.Appointments.Add(new Appointment
+        {
+            Id = appointmentId,
+            PatientId = "p1",
+            DentistId = "d1",
+            StartAt = FutureDate(9),
+            EndAt = FutureDate(9, 11),
+            Status = AppointmentStatus.PENDING
+        });
+
+        await db.SaveChangesAsync();
+
+        var service = CreateService(db);
+
+        var ex = await Assert.ThrowsAsync<AppException>(() =>
+            service.RescheduleAsync(
+                appointmentId,
+                new RescheduleAppointmentDto
+                {
+                    StartAt = DateTime.UtcNow.AddMinutes(-30),
+                    EndAt = DateTime.UtcNow.AddMinutes(30)
+                },
+                Patient("p1")
+            )
+        );
+
+        Assert.Equal(400, ex.StatusCode);
+        Assert.Equal("startAt must be in the future", ex.Message);
     }
 
     [Fact]

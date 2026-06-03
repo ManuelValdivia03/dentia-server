@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   HttpException,
   Injectable,
   Logger,
@@ -46,6 +47,8 @@ export class AppointmentsService {
   }
 
   async create(dto: CreateAppointmentDto, authHeader: string) {
+    this.validateAppointmentRange(dto.startAt, dto.endAt);
+
     return this.request('/appointments', {
       method: 'POST',
       authHeader,
@@ -58,6 +61,8 @@ export class AppointmentsService {
     dto: RescheduleAppointmentDto,
     authHeader: string,
   ) {
+    this.validateAppointmentRange(dto.startAt, dto.endAt);
+
     return this.request(`/appointments/${id}/reschedule`, {
       method: 'PATCH',
       authHeader,
@@ -144,6 +149,23 @@ export class AppointmentsService {
       throw new ServiceUnavailableException(
         'appointments-service is unavailable',
       );
+    }
+  }
+
+  private validateAppointmentRange(startAtValue: string, endAtValue: string) {
+    const startAt = new Date(startAtValue);
+    const endAt = new Date(endAtValue);
+
+    if (Number.isNaN(startAt.getTime()) || Number.isNaN(endAt.getTime())) {
+      throw new BadRequestException('startAt and endAt must be valid dates');
+    }
+
+    if (startAt.getTime() >= endAt.getTime()) {
+      throw new BadRequestException('startAt must be before endAt');
+    }
+
+    if (startAt.getTime() <= Date.now()) {
+      throw new BadRequestException('startAt must be in the future');
     }
   }
 

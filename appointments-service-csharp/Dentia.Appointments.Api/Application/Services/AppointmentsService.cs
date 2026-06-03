@@ -316,6 +316,11 @@ public class AppointmentsService : IAppointmentsService
         {
             throw new AppException(StatusCodes.Status400BadRequest, "startAt must be before endAt");
         }
+
+        if (start <= ToDbTimestamp(DateTime.UtcNow))
+        {
+            throw new AppException(StatusCodes.Status400BadRequest, "startAt must be in the future");
+        }
     }
 
     private static DateTime ToDbTimestamp(DateTime value)
