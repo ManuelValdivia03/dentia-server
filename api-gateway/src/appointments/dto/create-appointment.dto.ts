@@ -6,10 +6,12 @@ export class CreateAppointmentDto {
     example: 'patient_123',
     description:
       'ID de dominio del paciente. Para rol PATIENT el gateway lo sobrescribe con el usuario autenticado.',
+    required: false,
   })
+  @IsOptional()
   @IsString()
   @MinLength(1)
-  patientId: string;
+  patientId?: string;
 
   @ApiProperty({
     example: 'dentist_123',
