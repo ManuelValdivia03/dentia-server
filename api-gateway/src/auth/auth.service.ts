@@ -9,6 +9,7 @@ import { VerifyEmailDto } from './dto/verify-email.dto';
 import { ResendVerificationCodeDto } from './dto/resend-verification-code.dto';
 import { RequestPasswordResetDto } from './dto/request-password-reset.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { UpdateProfileDto } from '../users/dto/update-profile.dto';
 
 @Injectable()
 export class AuthService {
@@ -174,6 +175,61 @@ export class AuthService {
         headers: { authorization },
       }),
     );
+  }
+
+  async updateMe(
+    authorization: string,
+    dto: UpdateProfileDto,
+    photo?: Express.Multer.File,
+  ) {
+    const form = new FormData();
+
+    for (const [key, value] of Object.entries(dto)) {
+      if (value !== undefined && value !== null && value !== '') {
+        form.append(key, String(value));
+      }
+    }
+
+    if (photo) {
+      form.append('photo', photo.buffer, {
+        filename: photo.originalname,
+        contentType: photo.mimetype,
+        knownLength: photo.size,
+      });
+    }
+
+    try {
+      const response = await axios.patch(
+        `${this.authServiceBaseUrl}/profile`,
+        form,
+        {
+          headers: {
+            ...form.getHeaders(),
+            authorization,
+          },
+          maxBodyLength: Infinity,
+        },
+      );
+
+      return response.data;
+    } catch (error) {
+      const axiosError = error as AxiosError;
+
+      if (axiosError.response) {
+        this.logServiceFailure(
+          'auth-service',
+          'update-profile',
+          axiosError.response.status,
+        );
+        throw new HttpException(
+          (axiosError.response.data as any) ?? 'Error en auth-service',
+          axiosError.response.status,
+        );
+      }
+
+      this.logServiceFailure('auth-service', 'update-profile');
+      throw new HttpException('No se pudo conectar con auth-service', 503);
+    }
   }
 
   findAllDentists() {

@@ -81,10 +81,25 @@ export class AuthController {
           type: 'string',
           example: 'Juan Perez',
         },
+        phone: {
+          type: 'string',
+          example: '+52 555 123 4567',
+          description: 'Telefono de contacto opcional.',
+        },
+        birthDate: {
+          type: 'string',
+          example: '1990-05-12',
+          description: 'Fecha de nacimiento opcional para pacientes.',
+        },
         role: {
           type: 'string',
           enum: ['PATIENT', 'DENTIST'],
           example: 'PATIENT',
+        },
+        specialty: {
+          type: 'string',
+          example: 'Ortodoncia',
+          description: 'Especialidad opcional para dentistas.',
         },
         cedulaProfesional: {
           type: 'string',

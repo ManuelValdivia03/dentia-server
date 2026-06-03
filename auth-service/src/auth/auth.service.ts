@@ -20,6 +20,7 @@ import { VerifyEmailDto } from './dto/verify-email.dto';
 import { ResendVerificationCodeDto } from './dto/resend-verification-code.dto';
 import { RequestPasswordResetDto } from './dto/request-password-reset.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { UpdateProfileDto } from '../users/dto/update-profile.dto';
 import { User } from '../users/entities/user.entity';
 import { UserRole } from '../users/enums/user-role.enum';
 import { MailService } from '../mail/mail.service';
@@ -213,6 +214,7 @@ export class AuthService implements OnModuleInit {
       role,
       domainId: `${domainPrefix}-${randomUUID()}`,
       fullName: dto.fullName,
+      specialty: role === UserRole.DENTIST ? dto.specialty : undefined,
       cedulaProfesional:
         role === UserRole.DENTIST ? dto.cedulaProfesional : undefined,
       escuela: role === UserRole.DENTIST ? dto.escuela : undefined,
@@ -671,6 +673,48 @@ export class AuthService implements OnModuleInit {
     }
 
     return this.toSafeUser(user);
+  }
+
+  async updateProfile(
+    userId: string,
+    dto: UpdateProfileDto,
+    photo?: Express.Multer.File,
+  ) {
+    const user = await this.usersRepository.findOne({
+      where: { id: userId, isActive: true },
+    });
+
+    if (!user) {
+      throw new NotFoundException('Usuario no encontrado');
+    }
+
+    this.assertValidProfilePhoto(photo, false);
+
+    if (dto.fullName !== undefined) {
+      user.fullName = dto.fullName;
+    }
+
+    if (user.role === UserRole.DENTIST) {
+      if (dto.specialty !== undefined) {
+        user.specialty = dto.specialty || undefined;
+      }
+
+      if (dto.escuela !== undefined) {
+        user.escuela = dto.escuela || undefined;
+      }
+
+      if (dto.descripcion !== undefined) {
+        user.descripcion = dto.descripcion || undefined;
+      }
+    }
+
+    if (photo) {
+      user.profilePhoto = photo.buffer;
+      user.profilePhotoContentType = photo.mimetype;
+    }
+
+    const savedUser = await this.usersRepository.save(user);
+    return this.toSafeUser(savedUser);
   }
 
   async findAllDentists() {
