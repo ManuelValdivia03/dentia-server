@@ -24,3 +24,9 @@ obj/
 *.suo
 .vs/.env.production
 .env.production.bak.*
+# Postman / Newman generated reports
+postman/reports/
+newman/
+
+# Python coverage reports
+htmlcov/
