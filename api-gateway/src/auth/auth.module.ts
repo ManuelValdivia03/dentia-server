@@ -10,6 +10,7 @@ import { DentistsController } from '../dentists/dentists.controller';
 import { ProfilePhotosController } from '../dentists/profile-photos.controller';
 import { UserLookupController } from '../users/user-lookup.controller';
 import { RateLimitGuard } from './rate-limit.guard';
+import { AppointmentsService } from '../appointments/appointments.service';
 
 @Module({
   imports: [
@@ -26,7 +27,7 @@ import { RateLimitGuard } from './rate-limit.guard';
     ProfilePhotosController,
     UserLookupController,
   ],
-  providers: [AuthService, JwtAuthGuard, RolesGuard, RateLimitGuard],
+  providers: [AuthService, AppointmentsService, JwtAuthGuard, RolesGuard, RateLimitGuard],
   exports: [AuthService, JwtAuthGuard, RolesGuard, JwtModule],
 })
 export class AuthModule {}

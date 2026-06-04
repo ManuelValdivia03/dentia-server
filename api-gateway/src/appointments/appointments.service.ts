@@ -39,6 +39,13 @@ export class AppointmentsService {
     });
   }
 
+  async findPreviousDentistIds(authHeader: string) {
+    return this.request('/appointments/patient/dentists', {
+      method: 'GET',
+      authHeader,
+    });
+  }
+
   async findOne(id: string, authHeader: string) {
     return this.request(`/appointments/${id}`, {
       method: 'GET',

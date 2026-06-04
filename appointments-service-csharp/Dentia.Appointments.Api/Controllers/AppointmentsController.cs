@@ -57,6 +57,19 @@ public class AppointmentsController : ControllerBase
         return Ok(result);
     }
 
+    [HttpGet("patient/dentists")]
+    [Authorize(Roles = UserRoles.Patient)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> FindPreviousDentistIds()
+    {
+        var requester = _currentUserService.GetCurrentUser();
+        var result = await _appointmentsService.FindPreviousDentistIdsAsync(requester);
+
+        return Ok(new { dentistIds = result });
+    }
+
     [HttpGet("{id:guid}")]
     [Authorize(Roles = $"{UserRoles.Admin},{UserRoles.Patient},{UserRoles.Dentist}")]
     public async Task<IActionResult> FindOne([FromRoute] Guid id)

@@ -22,6 +22,7 @@ public interface IAppointmentsService
     Task<Appointment> ConfirmAsync(Guid id, RequestUser requester);
     Task<Appointment> CompleteAsync(Guid id, RequestUser requester);
     Task<object> HasPatientDentistRelationAsync(string patientId, string dentistId);
+    Task<List<string>> FindPreviousDentistIdsAsync(RequestUser requester);
 }
 
 public class AppointmentsService : IAppointmentsService
@@ -294,6 +295,26 @@ public class AppointmentsService : IAppointmentsService
         await _db.SaveChangesAsync();
         await _reportsClient.SendAppointmentSnapshotAsync(appointment);
         return appointment;
+    }
+
+    public async Task<List<string>> FindPreviousDentistIdsAsync(RequestUser requester)
+    {
+        if (requester.Role != UserRoles.Patient)
+        {
+            throw new AppException(
+                StatusCodes.Status403Forbidden,
+                "Only patients can access previous dentists"
+            );
+        }
+
+        return await _db.Appointments
+            .Where(x =>
+                x.PatientId == requester.DomainId &&
+                x.Status != AppointmentStatus.CANCELLED)
+            .OrderByDescending(x => x.StartAt)
+            .Select(x => x.DentistId)
+            .Distinct()
+            .ToListAsync();
     }
 
     public async Task<object> HasPatientDentistRelationAsync(string patientId, string dentistId)
