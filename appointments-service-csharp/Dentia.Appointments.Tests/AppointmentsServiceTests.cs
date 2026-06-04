@@ -275,6 +275,101 @@ public class AppointmentsServiceTests
     }
 
     [Fact]
+    public async Task FindByDayAsync_ShouldReturnOnlyDentistAppointmentsForSelectedDay()
+    {
+        await using var db = CreateDbContext();
+
+        db.Appointments.AddRange(
+            new Appointment
+            { 
+                Id = Guid.NewGuid(),
+                PatientId = "p1",
+                DentistId = "d1",
+                StartAt = DateTime.Parse("2026-06-10T10:00:00"),
+                EndAt = DateTime.Parse("2026-06-10T11:00:00"),
+                Status = AppointmentStatus.CONFIRMED
+            },
+            new Appointment
+            {
+                Id = Guid.NewGuid(),
+                PatientId = "p2",
+                DentistId = "d2",
+                StartAt = DateTime.Parse("2026-06-10T12:00:00"),
+                EndAt = DateTime.Parse("2026-06-10T13:00:00"),
+                Status = AppointmentStatus.CONFIRMED
+            },
+            new Appointment
+            {
+                Id = Guid.NewGuid(),
+                PatientId = "p3",
+                DentistId = "d1",
+                StartAt = DateTime.Parse("2026-06-11T10:00:00"),
+                EndAt = DateTime.Parse("2026-06-11T11:00:00"),
+                Status = AppointmentStatus.CONFIRMED
+            }
+        );
+
+        await db.SaveChangesAsync();
+
+        var service = CreateService(db);
+
+        var result = await service.FindByDayAsync("2026-06-10", null, Dentist("d1"));
+
+        Assert.Single(result);
+        Assert.All(result, appointment => Assert.Equal("d1", appointment.DentistId));
+        Assert.All(result, appointment => Assert.Equal(10, appointment.StartAt.Day));
+    }
+
+    [Fact]
+    public async Task FindByDayAsync_ShouldAllowAdminToFilterByDentist()
+    {
+        await using var db = CreateDbContext();
+
+        db.Appointments.AddRange(
+            new Appointment
+            {
+                Id = Guid.NewGuid(),
+                PatientId = "p1",
+                DentistId = "d1",
+                StartAt = DateTime.Parse("2026-06-10T10:00:00"),
+                EndAt = DateTime.Parse("2026-06-10T11:00:00"),
+                Status = AppointmentStatus.CONFIRMED
+            },
+            new Appointment
+            {
+                Id = Guid.NewGuid(),
+                PatientId = "p2",
+                DentistId = "d2",
+                StartAt = DateTime.Parse("2026-06-10T12:00:00"),
+                EndAt = DateTime.Parse("2026-06-10T13:00:00"),
+                Status = AppointmentStatus.CONFIRMED
+            }
+        );
+
+        await db.SaveChangesAsync();
+
+        var service = CreateService(db);
+
+        var result = await service.FindByDayAsync("2026-06-10", "d2", Admin());
+
+        Assert.Single(result);
+        Assert.Equal("d2", result[0].DentistId);
+    }
+
+    [Fact]
+    public async Task FindByDayAsync_ShouldThrow403_WhenRequesterIsPatient()
+    {
+        await using var db = CreateDbContext();
+        var service = CreateService(db);
+
+        var ex = await Assert.ThrowsAsync<AppException>(() =>
+            service.FindByDayAsync("2026-06-10", null, Patient("p1"))
+        );
+
+        Assert.Equal(403, ex.StatusCode);
+    }
+
+    [Fact]
     public async Task HasPatientDentistRelationAsync_ShouldReturnTrue_WhenAppointmentIsConfirmedOrCompleted()
     {
         await using var db = CreateDbContext();

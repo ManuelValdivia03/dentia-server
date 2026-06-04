@@ -81,6 +81,33 @@ export class AppointmentsController {
     );
   }
 
+  @Get('day')
+  @Roles(UserRole.ADMIN, UserRole.DENTIST)
+  @ApiOperation({ summary: 'Consultar agenda de citas por día' })
+  @ApiQuery({ name: 'date', required: true, example: '2026-06-01' })
+  @ApiQuery({
+    name: 'dentistId',
+    required: false,
+    example: 'd-123',
+    description: 'Solo aplica para ADMIN. DENTIST siempre usa su propio domainId.',
+  })
+  @ApiOkResponse({ description: 'Agenda diaria encontrada.' })
+  @ApiBadRequestResponse({ description: 'Fecha inválida.' }) 
+  @ApiUnauthorizedResponse({ description: 'JWT ausente o inválido.' })
+  @ApiForbiddenResponse({ description: 'Rol sin permisos suficientes.' })
+  @ApiServiceUnavailableResponse({ description: 'appointments-service no disponible.' })
+  findByDay(
+    @Query('date') date: string,
+    @Query('dentistId') dentistId: string | undefined,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.appointmentsService.findByDay(
+      date,
+      dentistId,
+      this.getAuthHeader(req),
+    );
+  }
+
   @Get(':id')
   @Roles(UserRole.ADMIN, UserRole.PATIENT, UserRole.DENTIST)
   @ApiOperation({ summary: 'Consultar cita por ID' })

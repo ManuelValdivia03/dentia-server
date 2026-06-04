@@ -13,6 +13,7 @@ namespace Dentia.Appointments.Api.Application.Services;
 public interface IAppointmentsService
 {
     Task<List<Appointment>> FindAllAsync(RequestUser requester);
+    Task<List<Appointment>> FindByDayAsync(string date, string? dentistId, RequestUser requester);
     Task<Appointment> FindOneAsync(Guid id, RequestUser requester);
     Task<object> GetAvailabilityAsync(string dentistId, string date, RequestUser requester);
     Task<Appointment> CreateAsync(CreateAppointmentDto dto, RequestUser requester);
@@ -56,6 +57,45 @@ public class AppointmentsService : IAppointmentsService
         return await query
             .OrderByDescending(x => x.StartAt)
             .ToListAsync();
+    }
+
+    public async Task<List<Appointment>> FindByDayAsync(
+    string date,
+    string? dentistId,
+    RequestUser requester)
+{
+    if (!DateOnly.TryParse(date, out var parsedDate))
+    {
+        throw new AppException(StatusCodes.Status400BadRequest, "date must be a valid date");
+    }
+
+    if (requester.Role == UserRoles.Patient)
+    {
+        throw new AppException(StatusCodes.Status403Forbidden, "Patients cannot access dentist agenda");
+    }
+
+    var dayStart = ToDbTimestamp(parsedDate.ToDateTime(TimeOnly.MinValue));
+    var dayEnd = dayStart.AddDays(1);
+
+    var query = _db.Appointments
+        .Where(x =>
+            x.Status != AppointmentStatus.CANCELLED &&
+            x.StartAt < dayEnd &&
+            x.EndAt > dayStart);
+
+    if (requester.Role == UserRoles.Dentist)
+    {
+        query = query.Where(x => x.DentistId == requester.DomainId);
+    }
+
+    if (requester.Role == UserRoles.Admin && !string.IsNullOrWhiteSpace(dentistId))
+    {
+        query = query.Where(x => x.DentistId == dentistId);
+    }
+
+    return await query
+        .OrderBy(x => x.StartAt)
+        .ToListAsync();
     }
 
     public async Task<Appointment> FindOneAsync(Guid id, RequestUser requester)

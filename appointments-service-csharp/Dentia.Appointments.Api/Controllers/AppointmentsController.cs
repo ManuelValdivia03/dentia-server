@@ -31,6 +31,21 @@ public class AppointmentsController : ControllerBase
         return Ok(result);
     }
 
+    [HttpGet("day")]
+    [Authorize(Roles = $"{UserRoles.Admin},{UserRoles.Dentist}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> FindByDay(
+    [FromQuery] string date,
+    [FromQuery] string? dentistId)
+    {
+        var requester = _currentUserService.GetCurrentUser();
+        var result = await _appointmentsService.FindByDayAsync(date, dentistId, requester);
+        return Ok(result);
+    }
+
     [HttpGet("availability")]
     [Authorize(Roles = $"{UserRoles.Admin},{UserRoles.Patient},{UserRoles.Dentist}")]
     public async Task<IActionResult> GetAvailability(

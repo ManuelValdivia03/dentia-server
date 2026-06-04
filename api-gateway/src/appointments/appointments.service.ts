@@ -22,6 +22,23 @@ export class AppointmentsService {
     });
   }
 
+  async findByDay(date: string, dentistId: string | undefined, authHeader: string) {
+    const query = new URLSearchParams();
+
+    if (date) {
+      query.set('date', date);
+    }
+
+    if (dentistId) {
+      query.set('dentistId', dentistId);
+    }
+
+    return this.request(`/appointments/day?${query.toString()}`, {
+      method: 'GET',
+      authHeader,
+    });
+  }
+
   async findOne(id: string, authHeader: string) {
     return this.request(`/appointments/${id}`, {
       method: 'GET',
