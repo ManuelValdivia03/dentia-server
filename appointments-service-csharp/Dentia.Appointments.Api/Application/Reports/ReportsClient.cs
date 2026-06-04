@@ -42,7 +42,10 @@ public class ReportsClient : IReportsClient
             AppointmentId = appointment.Id.ToString(),
             DoctorId = appointment.DentistId,
             PatientId = appointment.PatientId,
-            Status = appointment.Status.ToString(),
+            Status = appointment.Status.ToString().ToLowerInvariant(),
+            AppointmentType = string.IsNullOrWhiteSpace(appointment.Reason)
+                ? "Cita odontológica"
+                : appointment.Reason.Trim(),
             ScheduledAt = appointment.StartAt.ToString("O"),
             DurationMinutes = durationMinutes
         };

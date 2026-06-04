@@ -11,6 +11,7 @@ class ReportsService:
         MERGE (p:Patient {id: $patient_id})
         MERGE (a:Appointment {id: $appointment_id})
         SET a.status = $status,
+            a.type = $appointment_type,
             a.scheduledAt = datetime($scheduled_at),
             a.durationMinutes = $duration_minutes
         MERGE (d)-[:HAS_APPOINTMENT]->(a)
@@ -25,6 +26,7 @@ class ReportsService:
                 doctor_id=payload.doctor_id,
                 patient_id=payload.patient_id,
                 status=payload.status.value,
+                appointment_type=payload.appointment_type or "Cita odontológica",
                 scheduled_at=payload.scheduled_at,
                 duration_minutes=payload.duration_minutes,
             )

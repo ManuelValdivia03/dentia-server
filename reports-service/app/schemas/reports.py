@@ -14,6 +14,7 @@ class AppointmentSnapshotRequest(BaseModel):
     doctor_id: str = Field(..., examples=["doctor_456"])
     patient_id: str = Field(..., examples=["patient_789"])
     status: AppointmentStatus
+    appointment_type: str | None = Field(default=None, examples=["Limpieza"])
     scheduled_at: str = Field(..., examples=["2026-05-13T10:00:00Z"])
     duration_minutes: int = Field(..., examples=[60])
 

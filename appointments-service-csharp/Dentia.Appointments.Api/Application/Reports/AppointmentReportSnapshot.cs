@@ -16,6 +16,9 @@ public class AppointmentReportSnapshot
     [JsonPropertyName("status")]
     public string Status { get; set; } = string.Empty;
 
+    [JsonPropertyName("appointment_type")]
+    public string AppointmentType { get; set; } = string.Empty;
+
     [JsonPropertyName("scheduled_at")]
     public string ScheduledAt { get; set; } = string.Empty;
 
