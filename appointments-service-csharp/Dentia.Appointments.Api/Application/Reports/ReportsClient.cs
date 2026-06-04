@@ -42,7 +42,7 @@ public class ReportsClient : IReportsClient
             AppointmentId = appointment.Id.ToString(),
             DoctorId = appointment.DentistId,
             PatientId = appointment.PatientId,
-            Status = appointment.Status.ToString().ToLowerInvariant(),
+            Status = MapStatusForReports(appointment.Status),
             AppointmentType = string.IsNullOrWhiteSpace(appointment.Reason)
                 ? "Cita odontológica"
                 : appointment.Reason.Trim(),
@@ -90,5 +90,17 @@ public class ReportsClient : IReportsClient
                 appointment.Id
             );
         }
+    }
+
+    private static string MapStatusForReports(Domain.Enums.AppointmentStatus status)
+    {
+        return status switch
+        {
+            Domain.Enums.AppointmentStatus.PENDING => "scheduled",
+            Domain.Enums.AppointmentStatus.CONFIRMED => "confirmed",
+            Domain.Enums.AppointmentStatus.COMPLETED => "completed",
+            Domain.Enums.AppointmentStatus.CANCELLED => "cancelled",
+            _ => "scheduled"
+        };
     }
 }
