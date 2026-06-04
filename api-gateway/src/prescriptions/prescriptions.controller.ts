@@ -7,6 +7,7 @@ import {
   Post,
   Req,
   StreamableFile,
+  UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -57,8 +58,18 @@ export class PrescriptionsController {
     @Body() dto: CreatePrescriptionDto,
     @Req() req: AuthenticatedRequest,
   ) {
-    return this.prescriptionsService.create(dto, req.user);
+    return this.prescriptionsService.create(dto, req.user, this.getAuthHeader(req),);
   }
+
+  private getAuthHeader(req: Request): string {
+      const authHeader = req.headers.authorization;
+  
+      if (!authHeader) {
+        throw new UnauthorizedException('Authorization header is required');
+      }
+  
+      return authHeader;
+    }
 
   @Get('prescriptions/:id')
   @Roles(UserRole.ADMIN, UserRole.DENTIST, UserRole.PATIENT)

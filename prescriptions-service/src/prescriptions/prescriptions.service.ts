@@ -11,15 +11,17 @@ import { CreatePrescriptionDto } from './dto/create-prescription.dto';
 import { PrescriptionStatus } from './enums/prescription-status.enum';
 import { RequestUser, RequestUserRole } from './interfaces/request-user.interface';
 import { generatePrescriptionPdf } from './pdf/prescription-pdf.generator';
+import { AppointmentsClient } from './appointments.client';
 
 @Injectable()
 export class PrescriptionsService {
   constructor(
     @InjectRepository(Prescription)
     private readonly prescriptionsRepository: Repository<Prescription>,
+    private readonly appointmentsClient: AppointmentsClient,
   ) {}
 
-  async create(dto: CreatePrescriptionDto, requester: RequestUser) {
+  async create(dto: CreatePrescriptionDto, requester: RequestUser, authHeader: string, ) {
     if (
       requester.role !== RequestUserRole.DENTIST &&
       requester.role !== RequestUserRole.ADMIN
@@ -32,6 +34,29 @@ export class PrescriptionsService {
       dto.dentistId !== requester.domainId
     ) {
       throw new ForbiddenException('No puedes crear recetas para otro dentista');
+    }
+
+    const appointment = await this.appointmentsClient.findOne(
+      dto.appointmentId,
+      authHeader,
+    );
+
+    if (appointment.status !== 'COMPLETED') {
+      throw new BadRequestException(
+        'Solo se pueden crear recetas para citas completadas',
+      );
+    }
+
+    if (appointment.patientId !== dto.patientId) {
+      throw new BadRequestException(
+        'El paciente de la receta no coincide con la cita',
+      );
+    }
+
+    if (appointment.dentistId !== dto.dentistId) {
+      throw new ForbiddenException(
+        'El dentista de la receta no coincide con la cita',
+      );
     }
 
     const existingPrescription = await this.prescriptionsRepository.findOne({

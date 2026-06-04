@@ -45,6 +45,7 @@ services:
     ports: !reset []
     environment:
       NODE_ENV: production
+      APPOINTMENTS_SERVICE_URL: http://appointments-service:3002
 
   chat-mongo:
     ports: !reset []

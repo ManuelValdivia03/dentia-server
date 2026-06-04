@@ -164,6 +164,7 @@ services:
       DB_USER: ${POSTGRES_USER}
       DB_PASSWORD: ${POSTGRES_PASSWORD}
       DB_NAME: ${POSTGRES_PRESCRIPTIONS_DB}
+      APPOINTMENTS_SERVICE_URL: http://appointments-service:3002
     depends_on:
       postgres:
         condition: service_healthy

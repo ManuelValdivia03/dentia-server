@@ -18,11 +18,12 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
-import { MessagePattern, Payload } from '@nestjs/microservices';
+import { MessagePattern, Payload, RpcException } from '@nestjs/microservices';
 import { PrescriptionsService } from './prescriptions.service';
 import { CreatePrescriptionDto } from './dto/create-prescription.dto';
 import { RequestUser } from './interfaces/request-user.interface';
 import { Request } from 'express';
+import { HttpException } from '@nestjs/common';
 
 type AuthenticatedRequest = Request & {
   user: RequestUser;
@@ -52,11 +53,19 @@ export class PrescriptionsController {
   @ApiForbiddenResponse({ description: 'Rol sin permisos' })
   @ApiNotFoundResponse({ description: 'Cita asociada no encontrada' })
   @MessagePattern({ cmd: 'prescriptions.create' })
-  create(
+  async create(
     @Payload()
-    payload: { dto: CreatePrescriptionDto; requester: RequestUser },
+    payload: {dto: CreatePrescriptionDto; requester: RequestUser; authHeader: string;},
   ) {
-    return this.prescriptionsService.create(payload.dto, payload.requester);
+    try {
+      return await this.prescriptionsService.create(
+        payload.dto,
+        payload.requester,
+        payload.authHeader,
+      );
+    } catch (error) {
+      throw this.toRpcException(error);
+    }
   }
 
   @Get(':id')
@@ -105,5 +114,29 @@ export class PrescriptionsController {
     payload: { id: string; requester: RequestUser },
   ) {
     return this.prescriptionsService.generatePdf(payload.id, payload.requester);
+  }
+
+  private toRpcException(error: unknown): RpcException {
+    if (error instanceof HttpException) {
+      const statusCode = error.getStatus();
+      const response = error.getResponse();
+
+      const message =
+        typeof response === 'object' &&
+        response !== null &&
+        'message' in response
+          ? (response as { message: string | string[] }).message
+          : error.message;
+
+      return new RpcException({
+        statusCode,
+        message,
+      });
+  }
+
+  return new RpcException({
+      statusCode: 500,
+      message: error instanceof Error ? error.message : 'Internal server error',
+    });
   }
 }

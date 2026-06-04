@@ -1,4 +1,9 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import {
+  HttpException,
+  Inject,
+  Injectable,
+  Logger,
+} from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 import { firstValueFrom } from 'rxjs';
 import { CreatePrescriptionDto } from './dto/create-prescription.dto';
@@ -13,9 +18,12 @@ export class PrescriptionsService {
     private readonly client: ClientProxy,
   ) {}
 
-  create(dto: CreatePrescriptionDto, requester: RequestUser) {
+  create(dto: CreatePrescriptionDto, requester: RequestUser, authHeader: string) {
     return this.forward(
-      this.client.send({ cmd: 'prescriptions.create' }, { dto, requester }),
+      this.client.send(
+        { cmd: 'prescriptions.create' },
+        { dto, requester, authHeader },
+      ),
       'prescriptions.create',
     );
   }
@@ -47,17 +55,38 @@ export class PrescriptionsService {
   private async forward(request: any, operation: string): Promise<any> {
     try {
       return await firstValueFrom(request);
-    } catch (error) {
+    } catch (error: any) {
+      const rpcPayload =
+        typeof error?.message === 'object' && error.message !== null
+          ? error.message
+          : error?.response;
+
+      const possibleStatus =
+        rpcPayload?.statusCode ??
+        error?.statusCode ??
+        error?.response?.statusCode;
+
+      const status = typeof possibleStatus === 'number' ? possibleStatus : 503;
+
+      const message =
+        rpcPayload?.message ??
+        error?.response?.message ??
+        error?.message ??
+        error?.error ??
+        'prescriptions-service is unavailable';
+
       this.logger.warn(
         JSON.stringify({
           event: 'service_call_failed',
           service: 'api-gateway',
           targetService: 'prescriptions-service',
           operation,
-          reason: error instanceof Error ? error.message : 'unknown',
+          status,
+          message,
         }),
       );
-      throw error;
+
+      throw new HttpException(message, status);
     }
   }
 }
