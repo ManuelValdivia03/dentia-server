@@ -222,7 +222,7 @@ public class AppointmentsService : IAppointmentsService
         appointment.Notes = dto.Notes;
         appointment.UpdatedAt = ToDbTimestamp(DateTime.UtcNow);
 
-        await _db.SaveChangesAsync();
+        await SaveChangesHandlingOverlapAsync();
         await _reportsClient.SendAppointmentSnapshotAsync(appointment);
         await _eventsPublisher.PublishAppointmentRescheduledAsync(appointment);
 
