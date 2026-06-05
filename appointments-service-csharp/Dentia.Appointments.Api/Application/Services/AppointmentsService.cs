@@ -187,7 +187,7 @@ public class AppointmentsService : IAppointmentsService
         };
 
         _db.Appointments.Add(appointment);
-        await _db.SaveChangesAsync();
+        await SaveChangesHandlingOverlapAsync();
         await _reportsClient.SendAppointmentSnapshotAsync(appointment);
         await _eventsPublisher.PublishAppointmentCreatedAsync(appointment);
 
@@ -391,6 +391,23 @@ public class AppointmentsService : IAppointmentsService
         if (start <= ToDbTimestamp(DateTime.UtcNow))
         {
             throw new AppException(StatusCodes.Status400BadRequest, "startAt must be in the future");
+        }
+    }
+
+    private async Task SaveChangesHandlingOverlapAsync()
+    {
+        try
+        {
+            await _db.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex) when (
+            ex.InnerException?.Message.Contains("appointments_no_overlap_per_dentist") == true ||
+            ex.Message.Contains("appointments_no_overlap_per_dentist"))
+        {
+            throw new AppException(
+                StatusCodes.Status409Conflict,
+                "Dentist already has an appointment in this time range"
+            );
         }
     }
 
