@@ -70,18 +70,20 @@ export class DentistsController {
 
     const previousDentistIds = new Set(result?.dentistIds ?? []);
 
-    return [...dentists].sort((a, b) => {
-      const aVisited = previousDentistIds.has(a.domainId) ? 1 : 0;
-      const bVisited = previousDentistIds.has(b.domainId) ? 1 : 0;
+    return dentists
+      .map((dentist) => ({
+        ...dentist,
+        previouslyVisited: previousDentistIds.has(dentist.domainId),
+      }))
+      .sort((a, b) => {
+        if (a.previouslyVisited !== b.previouslyVisited) {
+          return a.previouslyVisited ? -1 : 1;
+        }
 
-      if (aVisited !== bVisited) {
-        return bVisited - aVisited;
-      }
-
-      return String(a.fullName ?? a.email ?? '').localeCompare(
-        String(b.fullName ?? b.email ?? ''),
-      );
-    });
+        return String(a.fullName ?? a.email ?? '').localeCompare(
+          String(b.fullName ?? b.email ?? ''),
+        );
+      });
   }
 
   @Get(':domainId/photo')
