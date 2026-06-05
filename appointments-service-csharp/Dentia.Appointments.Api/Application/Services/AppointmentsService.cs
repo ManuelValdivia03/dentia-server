@@ -125,7 +125,8 @@ public class AppointmentsService : IAppointmentsService
         var appointments = await _db.Appointments
             .Where(x =>
                 x.DentistId == dentistId &&
-                x.Status != AppointmentStatus.CANCELLED &&
+                (x.Status == AppointmentStatus.CONFIRMED ||
+                x.Status == AppointmentStatus.COMPLETED) &&
                 x.StartAt < businessEnd &&
                 x.EndAt > businessStart)
             .ToListAsync();
@@ -259,12 +260,51 @@ public class AppointmentsService : IAppointmentsService
             throw new AppException(StatusCodes.Status400BadRequest, "Cancelled appointments cannot be confirmed");
         }
 
-        appointment.Status = AppointmentStatus.CONFIRMED;
-        appointment.UpdatedAt = ToDbTimestamp(DateTime.UtcNow);
+        if (appointment.Status != AppointmentStatus.PENDING)
+        {
+            throw new AppException(StatusCodes.Status400BadRequest, "Only pending appointments can be confirmed");
+        }
 
-        await _db.SaveChangesAsync();
+        await using var transaction = await _db.Database.BeginTransactionAsync();
+
+        await EnsureNoOverlap(
+            appointment.DentistId,
+            appointment.StartAt,
+            appointment.EndAt,
+            appointment.Id
+        );
+
+        var now = ToDbTimestamp(DateTime.UtcNow);
+
+        var competingPendingAppointments = await _db.Appointments
+            .Where(x =>
+                x.Id != appointment.Id &&
+                x.DentistId == appointment.DentistId &&
+                x.Status == AppointmentStatus.PENDING &&
+                appointment.StartAt < x.EndAt &&
+                appointment.EndAt > x.StartAt)
+            .ToListAsync();
+
+        appointment.Status = AppointmentStatus.CONFIRMED;
+        appointment.UpdatedAt = now;
+
+        foreach (var competingAppointment in competingPendingAppointments)
+        {
+            competingAppointment.Status = AppointmentStatus.CANCELLED;
+            competingAppointment.UpdatedAt = now;
+        }
+
+        await SaveChangesHandlingOverlapAsync();
+        await transaction.CommitAsync();
+
         await _reportsClient.SendAppointmentSnapshotAsync(appointment);
         await _eventsPublisher.PublishAppointmentConfirmedAsync(appointment);
+
+        foreach (var competingAppointment in competingPendingAppointments)
+        {
+            await _reportsClient.SendAppointmentSnapshotAsync(competingAppointment);
+            await _eventsPublisher.PublishAppointmentCancelledAsync(competingAppointment);
+        }
 
         return appointment;
     }
@@ -367,7 +407,8 @@ public class AppointmentsService : IAppointmentsService
 
         var overlap = await _db.Appointments.AnyAsync(x =>
             x.DentistId == dentistId &&
-            x.Status != AppointmentStatus.CANCELLED &&
+            (x.Status == AppointmentStatus.CONFIRMED ||
+            x.Status == AppointmentStatus.COMPLETED) &&
             (!ignoreAppointmentId.HasValue || x.Id != ignoreAppointmentId.Value) &&
             start < x.EndAt &&
             end > x.StartAt);
