@@ -8,6 +8,7 @@ using Dentia.Appointments.Api.Domain.Entities;
 using Dentia.Appointments.Api.Domain.Enums;
 using Dentia.Appointments.Api.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 
 namespace Dentia.Appointments.Tests;
 
@@ -17,6 +18,8 @@ public class AppointmentsServiceTests
     {
         var options = new DbContextOptionsBuilder<AppointmentsDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .ConfigureWarnings(warnings =>
+                warnings.Ignore(InMemoryEventId.TransactionIgnoredWarning))
             .Options;
 
         return new AppointmentsDbContext(options);
@@ -102,39 +105,131 @@ public class AppointmentsServiceTests
     }
 
     [Fact]
-    public async Task CreateAsync_ShouldThrow409_WhenDentistHasOverlappingAppointment()
+    public async Task CreateAsync_ShouldAllowMultiplePendingRequestsForSameSlot()
     {
         await using var db = CreateDbContext();
         var service = CreateService(db);
 
-        await service.CreateAsync(
+        var startAt = FutureDate(8);
+        var endAt = FutureDate(8, 11);
+
+        var first = await service.CreateAsync(
             new CreateAppointmentDto
             {
                 PatientId = "p1",
                 DentistId = "d1",
-                StartAt = FutureDate(8),
-                EndAt = FutureDate(8, 11),
-                Reason = "Primera cita"
+                StartAt = startAt,
+                EndAt = endAt,
+                Reason = "Primera solicitud"
             },
             Patient("p1")
         );
 
+        var second = await service.CreateAsync(
+            new CreateAppointmentDto
+            {
+                PatientId = "p2",
+                DentistId = "d1",
+                StartAt = startAt,
+                EndAt = endAt,
+                Reason = "Segunda solicitud"
+            },
+            Patient("p2")
+        );
+
+        Assert.Equal(AppointmentStatus.PENDING, first.Status);
+        Assert.Equal(AppointmentStatus.PENDING, second.Status);
+        Assert.Equal(2, await db.Appointments.CountAsync());
+    }
+
+    [Fact]
+    public async Task CreateAsync_ShouldThrow409_WhenDentistHasConfirmedOverlappingAppointment()
+    {
+        await using var db = CreateDbContext();
+
+        var startAt = FutureDate(8);
+        var endAt = FutureDate(8, 11);
+
+        db.Appointments.Add(new Appointment
+        {
+            Id = Guid.NewGuid(),
+            PatientId = "p1",
+            DentistId = "d1",
+            StartAt = startAt,
+            EndAt = endAt,
+            Status = AppointmentStatus.CONFIRMED,
+            Reason = "Cita confirmada"
+        });
+
+        await db.SaveChangesAsync();
+        var service = CreateService(db);
         var ex = await Assert.ThrowsAsync<AppException>(() =>
             service.CreateAsync(
                 new CreateAppointmentDto
                 {
-                    PatientId = "p1",
+                    PatientId = "p2",
                     DentistId = "d1",
-                    StartAt = FutureDate(8).AddMinutes(30),
-                    EndAt = FutureDate(8, 11).AddMinutes(30),
-                    Reason = "Empalme"
+                    StartAt = startAt.AddMinutes(30),
+                    EndAt = endAt.AddMinutes(30),
+                    Reason = "Solicitud empalmada"
                 },
-                Patient("p1")
+                Patient("p2")
             )
         );
 
         Assert.Equal(409, ex.StatusCode);
         Assert.Equal("Dentist already has an appointment in this time range", ex.Message);
+    }
+
+    [Fact]
+    public async Task GetAvailabilityAsync_ShouldIgnorePendingRequestsAndBlockConfirmedAppointments()
+    {
+        await using var db = CreateDbContext();
+
+        var date = DateOnly.FromDateTime(DateTime.UtcNow.Date.AddDays(10));
+        var dayStart = date.ToDateTime(TimeOnly.MinValue);
+
+        db.Appointments.AddRange(
+            new Appointment
+            {
+                Id = Guid.NewGuid(),
+                PatientId = "p1",
+                DentistId = "d1",
+                StartAt = dayStart.AddHours(10),
+                EndAt = dayStart.AddHours(11),
+                Status = AppointmentStatus.PENDING,
+                Reason = "Solicitud pendiente"
+            },
+            new Appointment
+            {
+                Id = Guid.NewGuid(),
+                PatientId = "p2",
+                DentistId = "d1",
+                StartAt = dayStart.AddHours(11),
+                EndAt = dayStart.AddHours(12),
+                Status = AppointmentStatus.CONFIRMED,
+                Reason = "Cita confirmada"
+            }
+        );
+
+        await db.SaveChangesAsync();
+
+        var service = CreateService(db);
+        var result = await service.GetAvailabilityAsync("d1", date.ToString("yyyy-MM-dd"), Patient("p1"));
+
+        var slots = (IEnumerable<object>)result
+            .GetType()
+            .GetProperty("slots")!
+            .GetValue(result)!;
+
+        var slot10 = slots.First(slot =>
+            ((DateTime)slot.GetType().GetProperty("startAt")!.GetValue(slot)!).Hour == 10);
+
+        var slot11 = slots.First(slot =>
+            ((DateTime)slot.GetType().GetProperty("startAt")!.GetValue(slot)!).Hour == 11);
+
+        Assert.Equal(true, slot10.GetType().GetProperty("available")!.GetValue(slot10));
+        Assert.Equal(false, slot11.GetType().GetProperty("available")!.GetValue(slot11));
     }
 
     [Fact]
@@ -477,6 +572,103 @@ public class AppointmentsServiceTests
         );
 
         Assert.Equal(403, ex.StatusCode);
+    }
+
+    [Fact]
+    public async Task ConfirmAsync_ShouldConfirmSelectedRequestAndCancelCompetingPendingRequests()
+    {
+        await using var db = CreateDbContext();
+
+        var selectedId = Guid.NewGuid();
+        var competingId = Guid.NewGuid();
+        var nonCompetingId = Guid.NewGuid();
+
+        var startAt = FutureDate(12);
+        var endAt = FutureDate(12, 11);
+
+        db.Appointments.AddRange(
+            new Appointment
+            {
+                Id = selectedId,
+                PatientId = "p1",
+                DentistId = "d1",
+                StartAt = startAt,
+                EndAt = endAt,
+                Status = AppointmentStatus.PENDING,
+                Reason = "Solicitud seleccionada"
+            },
+            new Appointment
+            {
+                Id = competingId,
+                PatientId = "p2",
+                DentistId = "d1",
+                StartAt = startAt,
+                EndAt = endAt,
+                Status = AppointmentStatus.PENDING,
+                Reason = "Solicitud competidora"
+            },
+            new Appointment
+            {
+                Id = nonCompetingId,
+                PatientId = "p3",
+                DentistId = "d1",
+                StartAt = FutureDate(12, 12),
+                EndAt = FutureDate(12, 13),
+                Status = AppointmentStatus.PENDING,
+                Reason = "Solicitud en otro horario"
+            }
+        );
+
+        await db.SaveChangesAsync();
+
+        var reportsClient = new FakeReportsClient();
+        var eventsPublisher = new FakeAppointmentEventsPublisher();
+        var service = CreateService(db, reportsClient, eventsPublisher);
+
+        var result = await service.ConfirmAsync(selectedId, Dentist("d1"));
+
+        var selected = await db.Appointments.FindAsync(selectedId);
+        var competing = await db.Appointments.FindAsync(competingId);
+        var nonCompeting = await db.Appointments.FindAsync(nonCompetingId);
+
+        Assert.Equal(AppointmentStatus.CONFIRMED, result.Status);
+        Assert.Equal(AppointmentStatus.CONFIRMED, selected!.Status);
+        Assert.Equal(AppointmentStatus.CANCELLED, competing!.Status);
+        Assert.Equal(AppointmentStatus.PENDING, nonCompeting!.Status);
+
+        Assert.Equal(2, reportsClient.SnapshotsSent.Count);
+        Assert.Single(eventsPublisher.ConfirmedEvents);
+        Assert.Single(eventsPublisher.CancelledEvents);
+    }
+
+    [Fact]
+    public async Task ConfirmAsync_ShouldThrow400_WhenAppointmentIsNotPending()
+    {
+        await using var db = CreateDbContext();
+
+        var appointmentId = Guid.NewGuid();
+
+        db.Appointments.Add(new Appointment
+        {
+            Id = appointmentId,
+            PatientId = "p1",
+            DentistId = "d1",
+            StartAt = FutureDate(13),
+            EndAt = FutureDate(13, 11),
+            Status = AppointmentStatus.CONFIRMED,
+            Reason = "Ya confirmada"
+        });
+
+        await db.SaveChangesAsync();
+
+        var service = CreateService(db);
+
+        var ex = await Assert.ThrowsAsync<AppException>(() =>
+            service.ConfirmAsync(appointmentId, Dentist("d1"))
+        );
+
+        Assert.Equal(400, ex.StatusCode);
+        Assert.Equal("Only pending appointments can be confirmed", ex.Message);
     }
 
     [Fact]
