@@ -12,7 +12,7 @@ namespace Dentia.Appointments.Api.Application.Services;
 
 public interface IAppointmentsService
 {
-    Task<List<Appointment>> FindAllAsync(RequestUser requester);
+    Task<List<AppointmentResponseDto>> FindAllAsync(RequestUser requester);
     Task<List<Appointment>> FindByDayAsync(string date, string? dentistId, RequestUser requester);
     Task<Appointment> FindOneAsync(Guid id, RequestUser requester);
     Task<object> GetAvailabilityAsync(string dentistId, string date, RequestUser requester);
@@ -41,7 +41,7 @@ public class AppointmentsService : IAppointmentsService
         _eventsPublisher = eventsPublisher;
     }
 
-    public async Task<List<Appointment>> FindAllAsync(RequestUser requester)
+    public async Task<List<AppointmentResponseDto>> FindAllAsync(RequestUser requester)
     {
         var query = _db.Appointments.AsQueryable();
 
@@ -57,6 +57,20 @@ public class AppointmentsService : IAppointmentsService
 
         return await query
             .OrderByDescending(x => x.StartAt)
+            .Select(x => new AppointmentResponseDto
+            {
+                Id = x.Id,
+                PatientId = x.PatientId,
+                DentistId = x.DentistId,
+                StartAt = x.StartAt,
+                EndAt = x.EndAt,
+                Status = x.Status.ToString(),
+                Reason = x.Reason,
+                Notes = x.Notes,
+                CreatedAt = x.CreatedAt,
+                UpdatedAt = x.UpdatedAt,
+                HasRating = _db.AppointmentRatings.Any(r => r.AppointmentId == x.Id),
+            })
             .ToListAsync();
     }
 

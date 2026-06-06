@@ -11,7 +11,7 @@ export class CreateRatingDto {
   @IsInt()
   @Min(1)
   @Max(5)
-  rating: number;
+  score: number;
 
   @ApiPropertyOptional({ example: 'Excelente atención y explicación clara.' })
   @IsOptional()
