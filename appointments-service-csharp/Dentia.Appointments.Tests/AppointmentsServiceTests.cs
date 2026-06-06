@@ -742,4 +742,46 @@ public class AppointmentsServiceTests
             return Task.CompletedTask;
         }
     }
+
+    [Fact]
+    public async Task CreateAsync_ShouldThrow409_WhenPatientAlreadyHasPendingRequestForSameDentistAndTime()
+    {
+        await using var db = CreateDbContext();
+
+        var startAt = DateTime.UtcNow.AddDays(1).Date.AddHours(10);
+        var endAt = startAt.AddHours(1);
+
+        db.Appointments.Add(new Appointment
+        {
+            Id = Guid.NewGuid(),
+            PatientId = "p1",
+            DentistId = "d1",
+            StartAt = DateTime.SpecifyKind(startAt, DateTimeKind.Unspecified),
+            EndAt = DateTime.SpecifyKind(endAt, DateTimeKind.Unspecified),
+            Status = AppointmentStatus.PENDING,
+            Reason = "Consulta general",
+            CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+            UpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+        });
+
+        await db.SaveChangesAsync();
+
+        var service = CreateService(db);
+
+        var ex = await Assert.ThrowsAsync<AppException>(() =>
+            service.CreateAsync(
+                new CreateAppointmentDto
+                {
+                    PatientId = "p1",
+                    DentistId = "d1",
+                    StartAt = startAt,
+                    EndAt = endAt,
+                    Reason = "Consulta general",
+                },
+                Patient("p1")
+            )
+        );
+
+        Assert.Equal(409, ex.StatusCode);
+    }
 }

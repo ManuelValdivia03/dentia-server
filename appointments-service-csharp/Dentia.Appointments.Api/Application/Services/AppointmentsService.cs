@@ -169,6 +169,7 @@ public class AppointmentsService : IAppointmentsService
         var startAt = ToDbTimestamp(dto.StartAt);
         var endAt = ToDbTimestamp(dto.EndAt);
 
+        await EnsureNoDuplicatePendingRequest(dto.PatientId, dto.DentistId, startAt, endAt);
         await EnsureNoOverlap(dto.DentistId, startAt, endAt);
 
         var now = ToDbTimestamp(DateTime.UtcNow);
@@ -416,6 +417,28 @@ public class AppointmentsService : IAppointmentsService
         if (overlap)
         {
             throw new AppException(StatusCodes.Status409Conflict, "Dentist already has an appointment in this time range");
+        }
+    }
+
+    private async Task EnsureNoDuplicatePendingRequest(
+        string patientId,
+        string dentistId,
+        DateTime startAt,
+        DateTime endAt)
+    {
+        var exists = await _db.Appointments.AnyAsync(x =>
+            x.PatientId == patientId &&
+            x.DentistId == dentistId &&
+            x.Status == AppointmentStatus.PENDING &&
+            startAt < x.EndAt &&
+            endAt > x.StartAt);
+
+        if (exists)
+        {
+            throw new AppException(
+                StatusCodes.Status409Conflict,
+                "Patient already has a pending appointment request in this time range"
+            );
         }
     }
 
