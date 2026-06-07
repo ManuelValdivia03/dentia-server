@@ -32,9 +32,25 @@ if (-not $healthOk) {
     exit 1
 }
 
+Write-Host "Ejecutando seed de integración..."
+
+$env:POSTGRES_HOST = "localhost"
+$env:POSTGRES_PORT = "5439"
+$env:POSTGRES_USER = "dentia_test"
+$env:POSTGRES_PASSWORD = "dentia_test"
+$env:POSTGRES_DB = "dentia_auth_test"
+
+npm run seed:integration
+
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "Seed de integración falló."
+    exit $LASTEXITCODE
+}
+
 Write-Host "Entorno saludable. Ejecutando pruebas automatizadas..."
 
 $env:API_BASE_URL = "http://localhost:3100"
+$env:JWT_SECRET = "integration_test_secret"
 
 npm run test:integration
 
