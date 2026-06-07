@@ -30,19 +30,24 @@ public class AppointmentsService : IAppointmentsService
     private readonly AppointmentsDbContext _db;
     private readonly IReportsClient _reportsClient;
     private readonly IAppointmentEventsPublisher _eventsPublisher;
+    private readonly IExpiredAppointmentsService _expiredAppointmentsService;
 
     public AppointmentsService(
         AppointmentsDbContext db,
         IReportsClient reportsClient,
-        IAppointmentEventsPublisher eventsPublisher)
+        IAppointmentEventsPublisher eventsPublisher,
+        IExpiredAppointmentsService expiredAppointmentsService)
     {
         _db = db;
         _reportsClient = reportsClient;
         _eventsPublisher = eventsPublisher;
+        _expiredAppointmentsService = expiredAppointmentsService;
     }
 
     public async Task<List<AppointmentResponseDto>> FindAllAsync(RequestUser requester)
     {
+        await _expiredAppointmentsService.CancelExpiredPendingAppointmentsAsync(requester);
+
         var query = _db.Appointments.AsQueryable();
 
         if (requester.Role == UserRoles.Patient)
@@ -89,6 +94,10 @@ public class AppointmentsService : IAppointmentsService
         throw new AppException(StatusCodes.Status403Forbidden, "Patients cannot access dentist agenda");
     }
 
+    await _expiredAppointmentsService.CancelExpiredPendingAppointmentsAsync(
+    requester,
+    dentistId);
+
     var dayStart = ToDbTimestamp(parsedDate.ToDateTime(TimeOnly.MinValue));
     var dayEnd = dayStart.AddDays(1);
 
@@ -115,6 +124,8 @@ public class AppointmentsService : IAppointmentsService
 
     public async Task<Appointment> FindOneAsync(Guid id, RequestUser requester)
     {
+        await _expiredAppointmentsService.CancelExpiredPendingAppointmentsAsync(requester);
+
         var appointment = await GetAppointmentOrFail(id);
         EnsureCanAccess(appointment, requester);
         return appointment;
@@ -270,6 +281,20 @@ public class AppointmentsService : IAppointmentsService
             throw new AppException(StatusCodes.Status403Forbidden, "Only admin or assigned dentist can confirm");
         }
 
+        var now = ToDbTimestamp(DateTime.UtcNow);
+
+        if (appointment.Status == AppointmentStatus.PENDING && appointment.StartAt < now)
+        {
+            await _expiredAppointmentsService.CancelExpiredPendingAppointmentAsync(
+            appointment,
+            now);
+
+            throw new AppException(
+                StatusCodes.Status400BadRequest,
+                "Expired pending appointments cannot be confirmed"
+            );
+        }
+
         if (appointment.Status == AppointmentStatus.CANCELLED)
         {
             throw new AppException(StatusCodes.Status400BadRequest, "Cancelled appointments cannot be confirmed");
@@ -288,8 +313,6 @@ public class AppointmentsService : IAppointmentsService
             appointment.EndAt,
             appointment.Id
         );
-
-        var now = ToDbTimestamp(DateTime.UtcNow);
 
         var competingPendingAppointments = await _db.Appointments
             .Where(x =>
@@ -354,6 +377,8 @@ public class AppointmentsService : IAppointmentsService
 
     public async Task<List<string>> FindPreviousDentistIdsAsync(RequestUser requester)
     {
+        await _expiredAppointmentsService.CancelExpiredPendingAppointmentsAsync(requester);
+
         if (requester.Role != UserRoles.Patient)
         {
             throw new AppException(

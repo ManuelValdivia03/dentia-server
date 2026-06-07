@@ -5,6 +5,7 @@ using Dentia.Appointments.Api.Application.Services;
 using Dentia.Appointments.Api.Application.Events;
 using Dentia.Appointments.Api.Domain.Enums;
 using Dentia.Appointments.Api.Infrastructure.Persistence;
+using Dentia.Appointments.Api.Application.BackgroundServices;
 using Dentia.Appointments.Api.Application.Reports;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.EntityFrameworkCore;
@@ -41,8 +42,13 @@ builder.Services
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
+builder.Services.AddScoped<IExpiredAppointmentsService, ExpiredAppointmentsService>();
 builder.Services.AddScoped<IAppointmentsService, AppointmentsService>();
 builder.Services.AddScoped<IRatingsService, RatingsService>();
+builder.Services.AddScoped<IAppointmentEventsPublisher, AppointmentEventsPublisher>();
+builder.Services.AddHttpClient<IReportsClient, ReportsClient>();
+builder.Services.AddHostedService<ExpiredAppointmentsBackgroundService>();
+
 builder.Services.AddScoped<IAppointmentEventsPublisher, AppointmentEventsPublisher>();
 builder.Services.AddHttpClient<IReportsClient, ReportsClient>();
 
