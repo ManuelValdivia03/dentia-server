@@ -14,4 +14,6 @@ COPY --from=build /app/publish .
 
 EXPOSE 3004
 
+USER app
+
 ENTRYPOINT ["dotnet", "ChatService.dll"]
