@@ -197,7 +197,7 @@ public class AppointmentsService : IAppointmentsService
         await EnsureNoDuplicatePendingRequest(dto.PatientId, dto.DentistId, startAt, endAt);
         await EnsureNoOverlap(dto.DentistId, startAt, endAt);
 
-        var now = ToDbTimestamp(DateTime.UtcNow);
+        var now = AppointmentTime.Now();
 
         var appointment = new Appointment
         {
@@ -247,7 +247,7 @@ public class AppointmentsService : IAppointmentsService
         appointment.EndAt = endAt;
         appointment.Reason = dto.Reason;
         appointment.Notes = dto.Notes;
-        appointment.UpdatedAt = ToDbTimestamp(DateTime.UtcNow);
+        appointment.UpdatedAt = AppointmentTime.Now();
 
         await SaveChangesHandlingOverlapAsync();
         await _reportsClient.SendAppointmentSnapshotAsync(appointment);
@@ -263,7 +263,7 @@ public class AppointmentsService : IAppointmentsService
         EnsureCanAccess(appointment, requester);
 
         appointment.Status = AppointmentStatus.CANCELLED;
-        appointment.UpdatedAt = ToDbTimestamp(DateTime.UtcNow);
+        appointment.UpdatedAt = AppointmentTime.Now();
 
         await _db.SaveChangesAsync();
         await _reportsClient.SendAppointmentSnapshotAsync(appointment);
@@ -281,7 +281,7 @@ public class AppointmentsService : IAppointmentsService
             throw new AppException(StatusCodes.Status403Forbidden, "Only admin or assigned dentist can confirm");
         }
 
-        var now = ToDbTimestamp(DateTime.UtcNow);
+        var now = AppointmentTime.Now();
 
         if (appointment.Status == AppointmentStatus.PENDING && appointment.StartAt < now)
         {
@@ -362,13 +362,13 @@ public class AppointmentsService : IAppointmentsService
             throw new AppException(StatusCodes.Status400BadRequest, "Cancelled appointments cannot be completed");
         }
 
-        if (appointment.StartAt > ToDbTimestamp(DateTime.UtcNow))
+        if (appointment.StartAt > AppointmentTime.Now())
         {
             throw new AppException(StatusCodes.Status400BadRequest, "Appointment cannot be completed before its start time");
         }
 
         appointment.Status = AppointmentStatus.COMPLETED;
-        appointment.UpdatedAt = ToDbTimestamp(DateTime.UtcNow);
+        appointment.UpdatedAt = AppointmentTime.Now();
 
         await _db.SaveChangesAsync();
         await _reportsClient.SendAppointmentSnapshotAsync(appointment);
@@ -491,7 +491,7 @@ public class AppointmentsService : IAppointmentsService
             throw new AppException(StatusCodes.Status400BadRequest, "startAt must be before endAt");
         }
 
-        if (start <= ToDbTimestamp(DateTime.UtcNow))
+        if (start <= AppointmentTime.Now())
         {
             throw new AppException(StatusCodes.Status400BadRequest, "startAt must be in the future");
         }

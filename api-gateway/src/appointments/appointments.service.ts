@@ -177,20 +177,51 @@ export class AppointmentsService {
   }
 
   private validateAppointmentRange(startAtValue: string, endAtValue: string) {
-    const startAt = new Date(startAtValue);
-    const endAt = new Date(endAtValue);
+    const startAtKey = this.toClinicDateTimeKey(startAtValue);
+    const endAtKey = this.toClinicDateTimeKey(endAtValue);
 
-    if (Number.isNaN(startAt.getTime()) || Number.isNaN(endAt.getTime())) {
+    if (!startAtKey || !endAtKey) {
       throw new BadRequestException('startAt and endAt must be valid dates');
     }
 
-    if (startAt.getTime() >= endAt.getTime()) {
+    if (startAtKey >= endAtKey) {
       throw new BadRequestException('startAt must be before endAt');
     }
 
-    if (startAt.getTime() <= Date.now()) {
+    if (startAtKey <= this.getClinicNowKey()) {
       throw new BadRequestException('startAt must be in the future');
     }
+  }
+
+  private toClinicDateTimeKey(value: string) {
+    const match = value.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})/);
+
+    if (!match) {
+      return '';
+    }
+
+    return `${match[1]}T${match[2]}:${match[3]}`;
+  }
+
+  private getClinicNowKey() {
+    const timeZone =
+      process.env.APPOINTMENTS_TIME_ZONE ?? 'America/Mexico_City';
+
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).formatToParts(new Date());
+
+    const values = Object.fromEntries(
+      parts.map((part) => [part.type, part.value]),
+    );
+
+    return `${values.year}-${values.month}-${values.day}T${values.hour}:${values.minute}`;
   }
 
   private logServiceFailure(path: string, statusCode?: number) {
