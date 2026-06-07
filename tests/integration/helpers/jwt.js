@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'integration_test_secret';
+const JWT_SECRET =
+  process.env.JWT_SECRET || 'integration_test_secret_at_least_32_chars';
 
 function createTestToken({
   sub,

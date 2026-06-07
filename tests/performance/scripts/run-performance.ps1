@@ -1,8 +1,13 @@
+param(
+    [ValidateSet("smoke", "load", "stress")]
+    [string] $Profile = "load"
+)
+
 $ErrorActionPreference = "Stop"
 
-$projectName = "dentia-it"
+$projectName = "dentia-perf"
 $composeFile = "docker-compose.integration.yml"
-$keepEnvironment = $env:KEEP_INTEGRATION_ENV -eq "1"
+$keepEnvironment = $env:KEEP_PERFORMANCE_ENV -eq "1"
 
 if (Get-Command docker-compose -ErrorAction SilentlyContinue) {
     $composeCommand = "docker-compose"
@@ -15,43 +20,37 @@ if (Get-Command docker-compose -ErrorAction SilentlyContinue) {
 }
 
 function Invoke-Compose {
-    param(
-        [string[]] $ComposeArgs
-    )
+    param([string[]] $ComposeArgs)
 
     & $script:composeCommand @script:composePrefix @ComposeArgs
-
     if ($LASTEXITCODE -ne 0) {
         throw "Docker Compose fallo con codigo $LASTEXITCODE."
     }
 }
 
 function Show-Diagnostics {
-    Write-Host "Estado del entorno de integracion:"
     & $script:composeCommand @script:composePrefix `
         -p $script:projectName -f $script:composeFile ps -a
-
-    Write-Host "Logs recientes:"
     & $script:composeCommand @script:composePrefix `
         -p $script:projectName -f $script:composeFile logs --tail 150
 }
 
 try {
-    Write-Host "Limpiando entorno de integracion anterior..."
+    Write-Host "Limpiando entorno de rendimiento anterior..."
     Invoke-Compose @(
         "-p", $projectName,
         "-f", $composeFile,
         "down", "-v", "--remove-orphans"
     )
 
-    Write-Host "Construyendo y levantando servicios de integracion..."
+    Write-Host "Construyendo entorno de rendimiento..."
     Invoke-Compose @(
         "-p", $projectName,
         "-f", $composeFile,
         "up", "-d", "--build"
     )
 
-    Write-Host "Esperando a que API Gateway y sus dependencias esten saludables..."
+    Write-Host "Esperando servicios saludables..."
     $healthOk = $false
 
     for ($i = 1; $i -le 90; $i++) {
@@ -81,10 +80,10 @@ try {
     }
 
     if (-not $healthOk) {
-        throw "El entorno de integracion no quedo saludable."
+        throw "El entorno de rendimiento no quedo saludable."
     }
 
-    Write-Host "Sembrando datos deterministas..."
+    Write-Host "Sembrando datos..."
     $env:POSTGRES_HOST = "localhost"
     $env:POSTGRES_PORT = "5439"
     $env:POSTGRES_USER = "dentia_test"
@@ -93,28 +92,27 @@ try {
 
     & npm.cmd run seed:integration
     if ($LASTEXITCODE -ne 0) {
-        throw "El seed de integracion fallo con codigo $LASTEXITCODE."
+        throw "El seed fallo con codigo $LASTEXITCODE."
     }
 
-    Write-Host "Ejecutando pruebas de integracion automatizadas..."
+    Write-Host "Ejecutando perfil de rendimiento: $Profile..."
     $env:API_BASE_URL = "http://localhost:3100"
-    $env:JWT_SECRET = "integration_test_secret_at_least_32_chars"
-
-    & npm.cmd run test:integration:jest
+    $env:PERF_PROFILE = $Profile
+    & node tests/performance/run-performance.js
     if ($LASTEXITCODE -ne 0) {
-        throw "Las pruebas de integracion fallaron con codigo $LASTEXITCODE."
+        throw "Las pruebas de rendimiento fallaron con codigo $LASTEXITCODE."
     }
 
-    Write-Host "Todas las pruebas de integracion finalizaron correctamente."
+    Write-Host "Pruebas de rendimiento finalizadas correctamente."
 } catch {
     Write-Host "ERROR: $($_.Exception.Message)" -ForegroundColor Red
     Show-Diagnostics
     exit 1
 } finally {
     if ($keepEnvironment) {
-        Write-Host "KEEP_INTEGRATION_ENV=1: el entorno permanece activo."
+        Write-Host "KEEP_PERFORMANCE_ENV=1: el entorno permanece activo."
     } else {
-        Write-Host "Eliminando entorno de integracion..."
+        Write-Host "Eliminando entorno de rendimiento..."
         & $composeCommand @composePrefix `
             -p $projectName -f $composeFile down -v --remove-orphans
     }

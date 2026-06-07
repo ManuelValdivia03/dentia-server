@@ -3,6 +3,8 @@ dist/
 coverage/
 .env
 *.log
+.tmp/
+performance-results/
 .vscode/
 .idea/
 __pycache__/

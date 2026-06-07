@@ -1,0 +1,95 @@
+name: Performance tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: Performance profile
+        required: true
+        default: load
+        type: choice
+        options:
+          - smoke
+          - load
+          - stress
+      duration_seconds:
+        description: Duration per stage
+        required: false
+        default: "20"
+      concurrency:
+        description: Concurrent workers
+        required: false
+        default: "10"
+  schedule:
+    - cron: "0 8 * * 1"
+
+jobs:
+  performance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install test dependencies
+        run: npm ci
+
+      - name: Build and start performance environment
+        run: docker compose -p dentia-perf -f docker-compose.integration.yml up -d --build
+
+      - name: Wait for healthy gateway
+        shell: bash
+        run: |
+          for attempt in $(seq 1 90); do
+            if curl --fail --silent http://localhost:3100/health \
+              | jq -e '
+                  .status == "ok"
+                  and ([.checks.dependencies[] | .status] | all(. == "ok"))
+                ' >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Performance environment did not become healthy."
+          exit 1
+
+      - name: Seed deterministic data
+        env:
+          POSTGRES_HOST: localhost
+          POSTGRES_PORT: 5439
+          POSTGRES_USER: dentia_test
+          POSTGRES_PASSWORD: dentia_test
+          POSTGRES_DB: dentia_auth_test
+        run: npm run seed:integration
+
+      - name: Run performance thresholds
+        env:
+          API_BASE_URL: http://localhost:3100
+          PERF_PROFILE: ${{ inputs.profile || 'stress' }}
+          PERF_DURATION_SECONDS: ${{ inputs.duration_seconds || '20' }}
+          PERF_CONCURRENCY: ${{ inputs.concurrency || '10' }}
+          PERF_RESULTS_DIR: performance-results
+        run: npm run test:performance:load
+
+      - name: Upload performance report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-results
+          path: performance-results/
+          if-no-files-found: warn
+
+      - name: Show service logs on failure
+        if: failure()
+        run: docker compose -p dentia-perf -f docker-compose.integration.yml logs --tail 200
+
+      - name: Stop performance environment
+        if: always()
+        run: docker compose -p dentia-perf -f docker-compose.integration.yml down -v --remove-orphans

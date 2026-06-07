@@ -5,6 +5,13 @@ const PASSWORD = 'Password123!';
 
 const users = [
   {
+    id: '00000000-0000-0000-0000-000000000001',
+    email: 'admin.it@dentia.local',
+    role: 'ADMIN',
+    domainId: 'a-it-admin-001',
+    fullName: 'Administrador Integracion',
+  },
+  {
     id: '11111111-1111-1111-1111-111111111111',
     email: 'patient.it@dentia.local',
     role: 'PATIENT',

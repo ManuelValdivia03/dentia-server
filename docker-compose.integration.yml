@@ -108,7 +108,7 @@ services:
       TYPEORM_PASSWORD: dentia_test
       TYPEORM_DATABASE: dentia_auth_test
 
-      JWT_SECRET: integration_test_secret
+      JWT_SECRET: integration_test_secret_at_least_32_chars
       ACCESS_TOKEN_TTL: 1h
 
       SMTP_HOST: fake
@@ -157,8 +157,10 @@ services:
       DB_PASSWORD: dentia_test
       DB_DATABASE: dentia_appointments_test
 
-      JWT_SECRET: integration_test_secret
-      Jwt__Secret: integration_test_secret
+      JWT_SECRET: integration_test_secret_at_least_32_chars
+      Jwt__Secret: integration_test_secret_at_least_32_chars
+      REPORTS_SERVICE_URL: http://reports-service-it:3006
+      INTERNAL_API_KEY: integration-internal-key
 
       RABBITMQ_URL: amqp://rabbitmq-it:5672
       RabbitMq__Host: rabbitmq-it
@@ -218,7 +220,7 @@ services:
       TYPEORM_PASSWORD: dentia_test
       TYPEORM_DATABASE: dentia_prescriptions_test
 
-      JWT_SECRET: integration_test_secret
+      JWT_SECRET: integration_test_secret_at_least_32_chars
     ports:
       - "3103:3003"
     depends_on:
@@ -242,8 +244,10 @@ services:
 
       Storage__Path: /app/uploads
 
-      JWT_SECRET: integration_test_secret
-      Jwt__Secret: integration_test_secret
+      JWT_SECRET: integration_test_secret_at_least_32_chars
+      Jwt__Secret: integration_test_secret_at_least_32_chars
+      APPOINTMENTS_SERVICE_URL: http://appointments-service-it:8080
+      INTERNAL_API_KEY: integration-internal-key
     ports:
       - "3105:8080"
     depends_on:
@@ -263,8 +267,10 @@ services:
       Mongo__Database: dentia_chat_test
       Mongo__MessagesCollection: messages
 
-      JWT_SECRET: integration_test_secret
-      Jwt__Secret: integration_test_secret
+      JWT_SECRET: integration_test_secret_at_least_32_chars
+      Jwt__Secret: integration_test_secret_at_least_32_chars
+      APPOINTMENTS_SERVICE_URL: http://appointments-service-it:8080
+      INTERNAL_API_KEY: integration-internal-key
     ports:
       - "3104:8080"
     depends_on:
@@ -280,6 +286,8 @@ services:
       NEO4J_URI: bolt://neo4j-it:7687
       NEO4J_USER: neo4j
       NEO4J_PASSWORD: testpassword
+      JWT_SECRET: integration_test_secret_at_least_32_chars
+      INTERNAL_API_KEY: integration-internal-key
     ports:
       - "3106:3006"
     depends_on:
@@ -313,7 +321,7 @@ services:
       CHAT_SERVICE_URL: http://chat-service-it:8080
       REPORTS_SERVICE_URL: http://reports-service-it:3006
 
-      JWT_SECRET: integration_test_secret
+      JWT_SECRET: integration_test_secret_at_least_32_chars
       ACCESS_TOKEN_TTL: 1h
       INTERNAL_API_KEY: integration-internal-key
     ports:

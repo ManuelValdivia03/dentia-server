@@ -38,6 +38,10 @@ async function loginAsPatient() {
   return login('patient.it@dentia.local', 'Password123!');
 }
 
+async function loginAsAdmin() {
+  return login('admin.it@dentia.local', 'Password123!');
+}
+
 async function loginAsSecondPatient() {
   return login('patient2.it@dentia.local', 'Password123!');
 }
@@ -48,6 +52,7 @@ async function loginAsDentist() {
 
 module.exports = {
   extractAccessToken,
+  loginAsAdmin,
   loginAsPatient,
   loginAsSecondPatient,
   loginAsDentist,

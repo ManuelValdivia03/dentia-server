@@ -8,13 +8,11 @@ const {
   extractAppointmentId,
   extractList,
 } = require('./helpers/extract');
+const { futureUtcDay } = require('./helpers/dates');
 
 describe('Dentia appointments real integration flow', () => {
   const dentistId = 'd-it-dentist-001';
-
-  const minute = String(Date.now() % 50).padStart(2, '0');
-  const startAt = `2026-07-10T15:${minute}:00.000Z`;
-  const endAt = `2026-07-10T16:${minute}:00.000Z`;
+  const { startAt, endAt } = futureUtcDay(60, 15);
 
   let patientToken;
   let secondPatientToken;

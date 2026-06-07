@@ -220,6 +220,78 @@ Guia de operacion, health checks, metricas, logs y pruebas:
 
 ## Pruebas
 
+### Integracion completa
+
+```powershell
+npm.cmd run test:integration
+```
+
+Este comando elimina cualquier entorno anterior, reconstruye todos los
+servicios, espera a que las dependencias esten saludables, carga datos
+deterministas, ejecuta Jest y limpia los contenedores al finalizar.
+
+Para conservar el entorno despues de la ejecucion:
+
+```powershell
+$env:KEEP_INTEGRATION_ENV = "1"
+npm.cmd run test:integration
+```
+
+La misma suite se ejecuta automaticamente en GitHub Actions para cambios en
+`main`, pull requests y ejecuciones manuales.
+
+### Rendimiento automatizado
+
+```powershell
+npm.cmd run test:performance
+```
+
+Hay tres perfiles automatizados:
+
+```powershell
+npm.cmd run test:performance:smoke
+npm.cmd run test:performance
+npm.cmd run test:performance:stress
+```
+
+`smoke` hace una comprobacion corta en cada cambio; `load` ejecuta carga
+sostenida; y `stress` aumenta la concurrencia por etapas. Los perfiles cubren
+health, perfiles, dentistas, citas, disponibilidad, archivos, chat,
+prescripciones y reportes. Tambien miden login y escrituras reales de citas,
+mensajes, archivos y lecturas de chat.
+
+La prueba falla automaticamente cuando supera los limites de errores o
+latencia, o no alcanza el throughput minimo.
+
+El informe se guarda en:
+
+```txt
+performance-results/performance-smoke.json
+performance-results/performance-load.json
+performance-results/performance-stress.json
+```
+
+Valores configurables:
+
+```powershell
+$env:PERF_DURATION_SECONDS = "60"
+$env:PERF_CONCURRENCY = "25"
+$env:PERF_MAX_P95_MS = "1000"
+$env:PERF_MAX_SCENARIO_P95_MS = "1500"
+$env:PERF_MAX_LOGIN_P95_MS = "1500"
+$env:PERF_MAX_WRITE_P95_MS = "1800"
+$env:PERF_MAX_ERROR_RATE = "0.01"
+$env:PERF_MIN_RPS = "10"
+$env:PERF_WRITE_REQUESTS = "40"
+$env:PERF_WRITE_CONCURRENCY = "6"
+$env:PERF_STRESS_STAGES = "5,10,20,40,60"
+npm.cmd run test:performance
+```
+
+GitHub Actions ejecuta `smoke` despues de las pruebas de integracion. Ademas,
+ejecuta `stress` cada lunes y permite lanzar manualmente cualquier perfil,
+indicando duracion y concurrencia.
+
 ### api-gateway
 
 ```bash

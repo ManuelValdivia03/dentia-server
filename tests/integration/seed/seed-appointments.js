@@ -11,6 +11,12 @@ async function main() {
 
   await client.connect();
 
+  await client.query('DELETE FROM "appointment_ratings";');
+  await client.query(`
+    DELETE FROM appointments
+    WHERE id <> '44444444-4444-4444-4444-444444444444';
+  `);
+
   await client.query(`
     INSERT INTO appointments (
       id,
