@@ -1,3 +1,4 @@
+using Dentia.Appointments.Api.Application.Common;
 using Dentia.Appointments.Api.Application.Events;
 using Dentia.Appointments.Api.Application.Reports;
 using Dentia.Appointments.Api.Application.Security;
@@ -42,7 +43,7 @@ public class ExpiredAppointmentsService : IExpiredAppointmentsService
         string? dentistIdFilter = null,
         CancellationToken cancellationToken = default)
     {
-        var now = ToDbTimestamp(DateTime.UtcNow);
+        var now = AppointmentTime.Now();
 
         var query = _db.Appointments
             .Where(x =>
@@ -111,8 +112,4 @@ public class ExpiredAppointmentsService : IExpiredAppointmentsService
         await _eventsPublisher.PublishAppointmentCancelledAsync(appointment);
     }
 
-    private static DateTime ToDbTimestamp(DateTime value)
-    {
-        return DateTime.SpecifyKind(value, DateTimeKind.Unspecified);
-    }
 }
