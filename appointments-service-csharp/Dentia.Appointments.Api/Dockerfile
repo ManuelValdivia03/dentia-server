@@ -16,4 +16,6 @@ EXPOSE 3002
 
 ENV ASPNETCORE_URLS=http://+:3002
 
+USER app
+
 ENTRYPOINT ["dotnet", "Dentia.Appointments.Api.dll"]
