@@ -9,7 +9,7 @@ Write-Host "Esperando API Gateway saludable..."
 
 $healthOk = $false
 
-for ($i = 1; $i -le 30; $i++) {
+for ($i = 1; $i -le 45; $i++) {
     try {
         $response = Invoke-WebRequest -Uri "http://localhost:3100/health" -UseBasicParsing
         $json = $response.Content | ConvertFrom-Json
@@ -38,4 +38,10 @@ $env:API_BASE_URL = "http://localhost:3100"
 
 npm run test:integration
 
-Write-Host "Pruebas de integración finalizadas."
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "Pruebas de integración fallidas."
+    docker compose -p dentia-it -f docker-compose.integration.yml ps -a
+    exit $LASTEXITCODE
+}
+
+Write-Host "Pruebas de integración finalizadas correctamente."

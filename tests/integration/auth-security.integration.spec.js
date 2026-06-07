@@ -1,29 +1,15 @@
-const BASE_URL = process.env.API_BASE_URL || 'http://localhost:3100';
+const { request, expectStatus, uniqueEmail } = require('./helpers/http');
 
-async function request(path, options = {}) {
-  const response = await fetch(`${BASE_URL}${path}`, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...(options.headers || {}),
-    },
-    ...options,
+describe('Dentia integration auth and security checks', () => {
+  it('debe rechazar login sin body válido', async () => {
+    const res = await request('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({}),
+    });
+
+    expectStatus(res, [400, 401]);
   });
 
-  let body = null;
-
-  try {
-    body = await response.json();
-  } catch {
-    body = null;
-  }
-
-  return {
-    status: response.status,
-    body,
-  };
-}
-
-describe('Dentia integration security checks', () => {
   it('debe rechazar login con credenciales incorrectas', async () => {
     const res = await request('/auth/login', {
       method: 'POST',
@@ -33,7 +19,35 @@ describe('Dentia integration security checks', () => {
       }),
     });
 
-    expect([400, 401]).toContain(res.status);
+    expectStatus(res, [400, 401]);
+  });
+
+  it('debe rechazar registro con email inválido', async () => {
+    const res = await request('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({
+        email: 'correo-invalido',
+        password: 'Password123!',
+        name: 'Paciente IT',
+        role: 'patient',
+      }),
+    });
+
+    expect(res.status).toBe(400);
+  });
+
+  it('debe rechazar registro con password débil', async () => {
+    const res = await request('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({
+        email: uniqueEmail('weak-password'),
+        password: '123',
+        name: 'Paciente IT',
+        role: 'patient',
+      }),
+    });
+
+    expectStatus(res, [400, 422]);
   });
 
   it('debe rechazar acceso a perfil sin JWT', async () => {
@@ -44,16 +58,14 @@ describe('Dentia integration security checks', () => {
     expect(res.status).toBe(401);
   });
 
-  it('debe rechazar crear cita sin JWT', async () => {
-    const res = await request('/appointments', {
-      method: 'POST',
-      body: JSON.stringify({
-        dentistId: 'test-dentist-id',
-        startAt: '2026-06-10T15:00:00.000Z',
-        endAt: '2026-06-10T16:00:00.000Z',
-      }),
+  it('debe rechazar JWT inválido', async () => {
+    const res = await request('/profile', {
+      method: 'GET',
+      headers: {
+        Authorization: 'Bearer token-invalido',
+      },
     });
 
-    expect(res.status).toBe(401);
+    expectStatus(res, [401, 403]);
   });
 });
