@@ -35,7 +35,7 @@
   "scripts": {
     "test:newman:chat": "newman run postman/collections/Dentia_Chat_MVP_Newman.postman_collection.json -e postman/environments/Dentia_Local.postman_environment.json",
     "test:newman:chat:html": "newman run postman/collections/Dentia_Chat_MVP_Newman.postman_collection.json -e postman/environments/Dentia_Local.postman_environment.json --reporters cli,htmlextra --reporter-htmlextra-export postman/reports/chat-report.html",
-    "seed:integration": "node tests/integration/seed/seed-auth.js",
+    "seed:integration": "node tests/integration/seed/clean-prescriptions.js && node tests/integration/seed/seed-auth.js && node tests/integration/seed/seed-appointments.js",
     "test:integration": "jest --config jest.integration.config.js --runInBand",
     "test:integration:watch": "jest --config jest.integration.config.js --watch"
   },
