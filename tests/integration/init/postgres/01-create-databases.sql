@@ -1,0 +1,3 @@
+CREATE DATABASE dentia_auth_test;
+CREATE DATABASE dentia_appointments_test;
+CREATE DATABASE dentia_prescriptions_test;

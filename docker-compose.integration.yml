@@ -1,0 +1,299 @@
+services:
+  postgres-it:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: dentia_test
+      POSTGRES_PASSWORD: dentia_test
+      POSTGRES_DB: dentia_test
+    ports:
+      - "5439:5432"
+    volumes:
+      - ./tests/integration/init/postgres:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dentia_test -d dentia_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  files-mongo-it:
+    image: mongo:7
+    ports:
+      - "27028:27017"
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand({ ping: 1 }).ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  chat-mongo-it:
+    image: mongo:7
+    ports:
+      - "27029:27017"
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand({ ping: 1 }).ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  neo4j-it:
+    image: neo4j:5
+    environment:
+      NEO4J_AUTH: neo4j/testpassword
+    ports:
+      - "7476:7474"
+      - "7689:7687"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:7474 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  rabbitmq-it:
+    image: rabbitmq:3-management
+    ports:
+      - "5679:5672"
+      - "15679:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  auth-service-it:
+    build:
+      context: ./auth-service
+      dockerfile: Dockerfile
+    environment:
+      NODE_ENV: test
+      PORT: 3001
+
+      DATABASE_URL: postgresql://dentia_test:dentia_test@postgres-it:5432/dentia_auth_test
+
+      DB_HOST: postgres-it
+      DB_PORT: 5432
+      DB_USER: dentia_test
+      DB_PASS: dentia_test
+      DB_NAME: dentia_auth_test
+      DB_USERNAME: dentia_test
+      DB_PASSWORD: dentia_test
+      DB_DATABASE: dentia_auth_test
+
+      POSTGRES_HOST: postgres-it
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: dentia_test
+      POSTGRES_USERNAME: dentia_test
+      POSTGRES_PASSWORD: dentia_test
+      POSTGRES_DB: dentia_auth_test
+      POSTGRES_DATABASE: dentia_auth_test
+
+      DATABASE_HOST: postgres-it
+      DATABASE_PORT: 5432
+      DATABASE_USER: dentia_test
+      DATABASE_USERNAME: dentia_test
+      DATABASE_PASSWORD: dentia_test
+      DATABASE_NAME: dentia_auth_test
+
+      TYPEORM_HOST: postgres-it
+      TYPEORM_PORT: 5432
+      TYPEORM_USERNAME: dentia_test
+      TYPEORM_PASSWORD: dentia_test
+      TYPEORM_DATABASE: dentia_auth_test
+
+      JWT_SECRET: integration_test_secret
+      ACCESS_TOKEN_TTL: 1h
+
+      SMTP_HOST: fake
+      SMTP_PORT: 587
+      SMTP_USER: fake
+      SMTP_PASS: fake
+      MAIL_FROM: Dentia Test <test@dentia.local>
+    ports:
+      - "3101:3001"
+    depends_on:
+      postgres-it:
+        condition: service_healthy
+
+  appointments-service-it:
+    build:
+      context: ./appointments-service-csharp/Dentia.Appointments.Api
+      dockerfile: Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Testing
+      ASPNETCORE_URLS: http://+:8080
+
+      ConnectionStrings__Default: Host=postgres-it;Port=5432;Database=dentia_appointments_test;Username=dentia_test;Password=dentia_test
+      ConnectionStrings__DefaultConnection: Host=postgres-it;Port=5432;Database=dentia_appointments_test;Username=dentia_test;Password=dentia_test
+      ConnectionStrings__AppointmentsDb: Host=postgres-it;Port=5432;Database=dentia_appointments_test;Username=dentia_test;Password=dentia_test
+      ConnectionStrings__Postgres: Host=postgres-it;Port=5432;Database=dentia_appointments_test;Username=dentia_test;Password=dentia_test
+      ConnectionStrings__PostgreSql: Host=postgres-it;Port=5432;Database=dentia_appointments_test;Username=dentia_test;Password=dentia_test
+
+      Database__ConnectionString: Host=postgres-it;Port=5432;Database=dentia_appointments_test;Username=dentia_test;Password=dentia_test
+      Postgres__ConnectionString: Host=postgres-it;Port=5432;Database=dentia_appointments_test;Username=dentia_test;Password=dentia_test
+      PostgreSql__ConnectionString: Host=postgres-it;Port=5432;Database=dentia_appointments_test;Username=dentia_test;Password=dentia_test
+
+      POSTGRES_HOST: postgres-it
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: dentia_test
+      POSTGRES_USERNAME: dentia_test
+      POSTGRES_PASSWORD: dentia_test
+      POSTGRES_DB: dentia_appointments_test
+      POSTGRES_DATABASE: dentia_appointments_test
+
+      DB_HOST: postgres-it
+      DB_PORT: 5432
+      DB_USER: dentia_test
+      DB_PASS: dentia_test
+      DB_NAME: dentia_appointments_test
+      DB_USERNAME: dentia_test
+      DB_PASSWORD: dentia_test
+      DB_DATABASE: dentia_appointments_test
+
+      JWT_SECRET: integration_test_secret
+      Jwt__Secret: integration_test_secret
+
+      RABBITMQ_URL: amqp://rabbitmq-it:5672
+      RabbitMq__Host: rabbitmq-it
+      RabbitMq__Port: 5672
+      RabbitMq__Username: guest
+      RabbitMq__Password: guest
+    ports:
+      - "3102:8080"
+    depends_on:
+      postgres-it:
+        condition: service_healthy
+      rabbitmq-it:
+        condition: service_healthy
+
+  prescriptions-service-it:
+    build:
+      context: ./prescriptions-service
+      dockerfile: Dockerfile
+    environment:
+      NODE_ENV: test
+      PORT: 3003
+
+      DATABASE_URL: postgresql://dentia_test:dentia_test@postgres-it:5432/dentia_prescriptions_test
+
+      DB_HOST: postgres-it
+      DB_PORT: 5432
+      DB_USER: dentia_test
+      DB_PASS: dentia_test
+      DB_NAME: dentia_prescriptions_test
+      DB_USERNAME: dentia_test
+      DB_PASSWORD: dentia_test
+      DB_DATABASE: dentia_prescriptions_test
+
+      POSTGRES_HOST: postgres-it
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: dentia_test
+      POSTGRES_USERNAME: dentia_test
+      POSTGRES_PASSWORD: dentia_test
+      POSTGRES_DB: dentia_prescriptions_test
+      POSTGRES_DATABASE: dentia_prescriptions_test
+
+      DATABASE_HOST: postgres-it
+      DATABASE_PORT: 5432
+      DATABASE_USER: dentia_test
+      DATABASE_USERNAME: dentia_test
+      DATABASE_PASSWORD: dentia_test
+      DATABASE_NAME: dentia_prescriptions_test
+
+      TYPEORM_HOST: postgres-it
+      TYPEORM_PORT: 5432
+      TYPEORM_USERNAME: dentia_test
+      TYPEORM_PASSWORD: dentia_test
+      TYPEORM_DATABASE: dentia_prescriptions_test
+
+      JWT_SECRET: integration_test_secret
+    ports:
+      - "3103:3003"
+    depends_on:
+      postgres-it:
+        condition: service_healthy
+
+  files-service-it:
+    build:
+      context: ./files-service-csharp/FilesService
+      dockerfile: Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Testing
+      ASPNETCORE_URLS: http://+:8080
+
+      Mongo__ConnectionString: mongodb://files-mongo-it:27017
+      Mongo__DatabaseName: dentia_files_test
+      Mongo__Database: dentia_files_test
+      Mongo__FilesCollection: clinical_files
+
+      Storage__Path: /app/uploads
+
+      JWT_SECRET: integration_test_secret
+      Jwt__Secret: integration_test_secret
+    ports:
+      - "3105:8080"
+    depends_on:
+      files-mongo-it:
+        condition: service_healthy
+
+  chat-service-it:
+    build:
+      context: ./chat-service-csharp/ChatService
+      dockerfile: Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Testing
+      ASPNETCORE_URLS: http://+:8080
+
+      Mongo__ConnectionString: mongodb://chat-mongo-it:27017
+      Mongo__DatabaseName: dentia_chat_test
+      Mongo__Database: dentia_chat_test
+      Mongo__MessagesCollection: messages
+
+      JWT_SECRET: integration_test_secret
+      Jwt__Secret: integration_test_secret
+    ports:
+      - "3104:8080"
+    depends_on:
+      chat-mongo-it:
+        condition: service_healthy
+
+  reports-service-it:
+    build:
+      context: ./reports-service
+      dockerfile: Dockerfile
+    environment:
+      PORT: 3006
+      NEO4J_URI: bolt://neo4j-it:7687
+      NEO4J_USER: neo4j
+      NEO4J_PASSWORD: testpassword
+    ports:
+      - "3106:3006"
+    depends_on:
+      neo4j-it:
+        condition: service_healthy
+
+  api-gateway-it:
+    build:
+      context: ./api-gateway
+      dockerfile: Dockerfile
+    environment:
+      NODE_ENV: test
+      PORT: 3100
+
+      AUTH_SERVICE_URL: http://auth-service-it:3001
+      APPOINTMENTS_SERVICE_URL: http://appointments-service-it:8080
+      PRESCRIPTIONS_SERVICE_URL: http://prescriptions-service-it:3003
+      FILES_SERVICE_URL: http://files-service-it:8080
+      CHAT_SERVICE_URL: http://chat-service-it:8080
+      REPORTS_SERVICE_URL: http://reports-service-it:3006
+
+      JWT_SECRET: integration_test_secret
+      ACCESS_TOKEN_TTL: 1h
+      INTERNAL_API_KEY: integration-internal-key
+    ports:
+      - "3100:3100"
+    depends_on:
+      - auth-service-it
+      - appointments-service-it
+      - prescriptions-service-it
+      - files-service-it
+      - chat-service-it
+      - reports-service-it
