@@ -68,10 +68,20 @@ public class AppointmentsServiceTests
         FakeReportsClient? reportsClient = null,
         FakeAppointmentEventsPublisher? eventsPublisher = null)
     {
+        var reports = reportsClient ?? new FakeReportsClient();
+        var events = eventsPublisher ?? new FakeAppointmentEventsPublisher();
+
+        var expiredAppointmentsService = new ExpiredAppointmentsService(
+            db,
+            reports,
+            events
+        );
+
         return new AppointmentsService(
             db,
-            reportsClient ?? new FakeReportsClient(),
-            eventsPublisher ?? new FakeAppointmentEventsPublisher()
+            reports,
+            events,
+            expiredAppointmentsService
         );
     }
 
@@ -558,8 +568,8 @@ public class AppointmentsServiceTests
             Id = appointmentId,
             PatientId = "p1",
             DentistId = "d1",
-            StartAt = DateTime.Parse("2026-05-08T10:00:00"),
-            EndAt = DateTime.Parse("2026-05-08T11:00:00"),
+            StartAt = FutureDate(14),
+            EndAt = FutureDate(14, 11),
             Status = AppointmentStatus.PENDING
         });
 
@@ -783,5 +793,99 @@ public class AppointmentsServiceTests
         );
 
         Assert.Equal(409, ex.StatusCode);
+    }
+
+    [Fact]
+    public async Task FindAllAsync_ShouldAutoCancelExpiredPendingAppointments()
+    {
+        await using var db = CreateDbContext();
+
+        var expiredId = Guid.NewGuid();
+        var futureId = Guid.NewGuid();
+        var confirmedPastId = Guid.NewGuid();
+
+        db.Appointments.AddRange(
+            new Appointment
+            {
+                Id = expiredId,
+                PatientId = "p1",
+                DentistId = "d1",
+                StartAt = DateTime.SpecifyKind(DateTime.UtcNow.AddDays(-1), DateTimeKind.Unspecified),
+                EndAt = DateTime.SpecifyKind(DateTime.UtcNow.AddDays(-1).AddHours(1), DateTimeKind.Unspecified),
+                Status = AppointmentStatus.PENDING
+            },
+            new Appointment
+            {
+                Id = futureId,
+                PatientId = "p1",
+                DentistId = "d1",
+                StartAt = FutureDate(2),
+                EndAt = FutureDate(2, 11),
+                Status = AppointmentStatus.PENDING
+            },
+            new Appointment
+            {
+                Id = confirmedPastId,
+                PatientId = "p1",
+                DentistId = "d1",
+                StartAt = DateTime.SpecifyKind(DateTime.UtcNow.AddDays(-2), DateTimeKind.Unspecified),
+                EndAt = DateTime.SpecifyKind(DateTime.UtcNow.AddDays(-2).AddHours(1), DateTimeKind.Unspecified),
+                Status = AppointmentStatus.CONFIRMED
+            }
+        );
+
+        await db.SaveChangesAsync();
+
+        var reportsClient = new FakeReportsClient();
+        var eventsPublisher = new FakeAppointmentEventsPublisher();
+        var service = CreateService(db, reportsClient, eventsPublisher);
+
+        await service.FindAllAsync(Patient("p1"));
+
+        var expired = await db.Appointments.FindAsync(expiredId);
+        var future = await db.Appointments.FindAsync(futureId);
+        var confirmedPast = await db.Appointments.FindAsync(confirmedPastId);
+
+        Assert.Equal(AppointmentStatus.CANCELLED, expired!.Status);
+        Assert.Equal(AppointmentStatus.PENDING, future!.Status);
+        Assert.Equal(AppointmentStatus.CONFIRMED, confirmedPast!.Status);
+        Assert.Single(reportsClient.SnapshotsSent);
+        Assert.Single(eventsPublisher.CancelledEvents);
+    }
+
+    [Fact]
+    public async Task ConfirmAsync_ShouldCancelExpiredPendingAppointmentAndThrow400()
+    {
+        await using var db = CreateDbContext();
+
+        var appointmentId = Guid.NewGuid();
+
+        db.Appointments.Add(new Appointment
+        {
+            Id = appointmentId,
+            PatientId = "p1",
+            DentistId = "d1",
+            StartAt = DateTime.SpecifyKind(DateTime.UtcNow.AddDays(-1), DateTimeKind.Unspecified),
+            EndAt = DateTime.SpecifyKind(DateTime.UtcNow.AddDays(-1).AddHours(1), DateTimeKind.Unspecified),
+            Status = AppointmentStatus.PENDING
+        });
+
+        await db.SaveChangesAsync();
+
+        var reportsClient = new FakeReportsClient();
+        var eventsPublisher = new FakeAppointmentEventsPublisher();
+        var service = CreateService(db, reportsClient, eventsPublisher);
+
+        var ex = await Assert.ThrowsAsync<AppException>(() =>
+            service.ConfirmAsync(appointmentId, Dentist("d1"))
+        );
+
+        var appointment = await db.Appointments.FindAsync(appointmentId);
+
+        Assert.Equal(400, ex.StatusCode);
+        Assert.Equal("Expired pending appointments cannot be confirmed", ex.Message);
+        Assert.Equal(AppointmentStatus.CANCELLED, appointment!.Status);
+        Assert.Single(reportsClient.SnapshotsSent);
+        Assert.Single(eventsPublisher.CancelledEvents);
     }
 }
