@@ -16,8 +16,8 @@ namespace FilesService.Controllers;
 [Tags("Files")]
 public class FilesController : ControllerBase
 {
-    private readonly FileMetadataService _metadataService;
-    private readonly FileStorageService _storageService;
+    private readonly IFileMetadataService _metadataService;
+    private readonly IFileStorageService _storageService;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IConfiguration _configuration;
 
@@ -34,8 +34,8 @@ public class FilesController : ControllerBase
     };
 
     public FilesController(
-        FileMetadataService metadataService,
-        FileStorageService storageService,
+        IFileMetadataService metadataService,
+        IFileStorageService storageService,
         IHttpClientFactory httpClientFactory,
         IConfiguration configuration)
     {

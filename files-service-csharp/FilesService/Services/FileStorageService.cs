@@ -1,6 +1,6 @@
 namespace FilesService.Services;
 
-public class FileStorageService
+public class FileStorageService : IFileStorageService
 {
     private readonly string _storagePath;
 
