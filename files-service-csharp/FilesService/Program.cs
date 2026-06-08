@@ -23,8 +23,8 @@ builder.Services.Configure<FormOptions>(options =>
 builder.Services.Configure<MongoSettings>(
     builder.Configuration.GetSection("Mongo"));
 
-builder.Services.AddSingleton<FileMetadataService>();
-builder.Services.AddSingleton<FileStorageService>();
+builder.Services.AddSingleton<IFileMetadataService, FileMetadataService>();
+builder.Services.AddSingleton<IFileStorageService, FileStorageService>();
 builder.Services.AddHttpClient();
 
 builder.Services.AddControllers();

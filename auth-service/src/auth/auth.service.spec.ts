@@ -767,4 +767,376 @@ describe('AuthService', () => {
       message: 'Contrasena actualizada correctamente',
     });
   });
+
+  it('refresh debe fallar si no recibe refresh token', async () => {
+    await expect(service.refresh()).rejects.toThrow(UnauthorizedException);
+
+    expect(refreshSessionsRepository.findOne).not.toHaveBeenCalled();
+    expect(jwtService.signAsync).not.toHaveBeenCalled();
+  });
+
+  it('refresh debe generar nuevo accessToken y rotar refreshToken si la sesion es valida', async () => {
+    const now = Date.now();
+
+    const session = {
+      id: 'session-1',
+      userId: 'u1',
+      tokenHash: 'old-hash',
+      lastActivityAt: new Date(now),
+      expiresAt: new Date(now + 60 * 60 * 1000),
+      revokedAt: null,
+    };
+
+    const user = {
+      id: 'u1',
+      email: 'patient1@dentia.local',
+      role: UserRole.PATIENT,
+      domainId: 'p1',
+      fullName: 'Paciente Demo',
+      isActive: true,
+      emailVerified: true,
+    };
+
+    refreshSessionsRepository.findOne.mockResolvedValueOnce(session);
+    refreshSessionsRepository.save.mockImplementation(async (saved: any) => saved);
+    usersRepository.findOne.mockResolvedValueOnce(user);
+    jwtService.signAsync.mockResolvedValueOnce('new-access-token');
+
+    const result = await service.refresh('valid-refresh-token');
+
+    expect(refreshSessionsRepository.findOne).toHaveBeenCalled();
+    expect(refreshSessionsRepository.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'session-1',
+        userId: 'u1',
+        tokenHash: expect.any(String),
+        lastActivityAt: expect.any(Date),
+        revokedAt: null,
+      }),
+    );
+
+    expect(jwtService.signAsync).toHaveBeenCalledWith(
+      {
+        sub: 'u1',
+        sid: 'session-1',
+        role: UserRole.PATIENT,
+        domainId: 'p1',
+        email: user.email,
+      },
+      {
+        expiresIn: '2m',
+      },
+    );
+
+    expect(result).toEqual({
+      accessToken: 'new-access-token',
+      refreshToken: expect.any(String),
+      user: expect.objectContaining({
+        id: 'u1',
+        email: user.email,
+        role: UserRole.PATIENT,
+        domainId: 'p1',
+        emailVerified: true,
+      }),
+    });
+  });
+
+  it('refresh debe revocar sesion expirada y fallar', async () => {
+    const session = {
+      id: 'session-1',
+      userId: 'u1',
+      tokenHash: 'old-hash',
+      lastActivityAt: new Date(Date.now() - 60 * 1000),
+      expiresAt: new Date(Date.now() - 1000),
+      revokedAt: null,
+    };
+
+    refreshSessionsRepository.findOne.mockResolvedValueOnce(session);
+    refreshSessionsRepository.save.mockImplementation(async (saved: any) => saved);
+
+    await expect(service.refresh('expired-refresh-token')).rejects.toThrow(
+      UnauthorizedException,
+    );
+
+    expect(session.revokedAt).toBeInstanceOf(Date);
+    expect(refreshSessionsRepository.save).toHaveBeenCalledWith(session);
+    expect(jwtService.signAsync).not.toHaveBeenCalled();
+  });
+
+  it('logout debe revocar sesion si el refresh token existe', async () => {
+    const session = {
+      id: 'session-1',
+      userId: 'u1',
+      tokenHash: 'token-hash',
+      revokedAt: null,
+    };
+
+    refreshSessionsRepository.findOne.mockResolvedValueOnce(session);
+    refreshSessionsRepository.save.mockImplementation(async (saved: any) => saved);
+
+    const result = await service.logout('refresh-token');
+
+    expect(session.revokedAt).toBeInstanceOf(Date);
+    expect(refreshSessionsRepository.save).toHaveBeenCalledWith(session);
+    expect(result).toEqual({ message: 'Sesion cerrada' });
+  });
+
+  it('logout debe responder ok aunque no reciba refresh token', async () => {
+    const result = await service.logout();
+
+    expect(refreshSessionsRepository.findOne).not.toHaveBeenCalled();
+    expect(result).toEqual({ message: 'Sesion cerrada' });
+  });
+
+  it('login debe fallar si la cuenta ya esta bloqueada y no debe comparar password', async () => {
+    const user = {
+      id: 'u1',
+      email: 'patient1@dentia.local',
+      passwordHash: 'hash-real',
+      role: UserRole.PATIENT,
+      domainId: 'p1',
+      isActive: true,
+      emailVerified: true,
+      failedLoginAttempts: 5,
+      loginLockedUntil: new Date(Date.now() + 10 * 60 * 1000),
+    };
+
+    usersRepository.findOne.mockResolvedValueOnce(user);
+
+    await expect(
+      service.login({
+        email: 'patient1@dentia.local',
+        password: 'Patient123*',
+      }),
+    ).rejects.toThrow(HttpException);
+
+    expect(bcrypt.compare).not.toHaveBeenCalled();
+    expect(usersRepository.save).not.toHaveBeenCalled();
+    expect(jwtService.signAsync).not.toHaveBeenCalled();
+  });
+
+  it('resendVerificationCode debe rechazar si aun esta en cooldown', async () => {
+    const user = {
+      id: 'u1',
+      email: 'nuevo@dentia.local',
+      role: UserRole.PATIENT,
+      domainId: 'p1',
+      isActive: true,
+      emailVerified: false,
+      emailVerificationCodeHash: 'old-hash',
+      emailVerificationExpiresAt: new Date(Date.now() + 10 * 60 * 1000),
+      emailVerificationAttempts: 1,
+      emailVerificationLastSentAt: new Date(),
+      emailVerificationLockedUntil: null,
+    };
+
+    usersRepository.findOne.mockResolvedValueOnce(user);
+
+    await expect(
+      service.resendVerificationCode({
+        email: 'nuevo@dentia.local',
+      }),
+    ).rejects.toThrow(HttpException);
+
+    expect(usersRepository.save).not.toHaveBeenCalled();
+    expect(mailService.sendVerificationCode).not.toHaveBeenCalled();
+  });
+
+  it('requestPasswordReset debe responder mensaje generico si el usuario no existe', async () => {
+    usersRepository.findOne.mockResolvedValueOnce(null);
+
+    const result = await service.requestPasswordReset({
+      email: 'noexiste@dentia.local',
+    });
+
+    expect(result).toEqual({
+      message:
+        'Si el correo existe y esta verificado, enviaremos un codigo de recuperacion.',
+    });
+
+    expect(usersRepository.save).not.toHaveBeenCalled();
+    expect(mailService.sendPasswordResetCode).not.toHaveBeenCalled();
+  });
+
+  it('requestPasswordReset debe responder mensaje generico si el correo no esta verificado', async () => {
+    usersRepository.findOne.mockResolvedValueOnce({
+      id: 'u1',
+      email: 'nuevo@dentia.local',
+      role: UserRole.PATIENT,
+      domainId: 'p1',
+      isActive: true,
+      emailVerified: false,
+    });
+
+    const result = await service.requestPasswordReset({
+      email: 'nuevo@dentia.local',
+    });
+
+    expect(result).toEqual({
+      message:
+        'Si el correo existe y esta verificado, enviaremos un codigo de recuperacion.',
+    });
+
+    expect(usersRepository.save).not.toHaveBeenCalled();
+    expect(mailService.sendPasswordResetCode).not.toHaveBeenCalled();
+  });
+
+  it('requestPasswordReset debe fallar si la recuperacion esta bloqueada', async () => {
+    const user = {
+      id: 'u1',
+      email: 'patient1@dentia.local',
+      role: UserRole.PATIENT,
+      domainId: 'p1',
+      isActive: true,
+      emailVerified: true,
+      passwordResetLockedUntil: new Date(Date.now() + 10 * 60 * 1000),
+    };
+
+    usersRepository.findOne.mockResolvedValueOnce(user);
+
+    await expect(
+      service.requestPasswordReset({
+        email: 'patient1@dentia.local',
+      }),
+    ).rejects.toThrow(HttpException);
+
+    expect(usersRepository.save).not.toHaveBeenCalled();
+    expect(mailService.sendPasswordResetCode).not.toHaveBeenCalled();
+  });
+
+  it('requestPasswordReset debe fallar si aun esta en cooldown', async () => {
+    const user = {
+      id: 'u1',
+      email: 'patient1@dentia.local',
+      role: UserRole.PATIENT,
+      domainId: 'p1',
+      isActive: true,
+      emailVerified: true,
+      passwordResetLockedUntil: null,
+      passwordResetLastSentAt: new Date(),
+    };
+
+    usersRepository.findOne.mockResolvedValueOnce(user);
+
+    await expect(
+      service.requestPasswordReset({
+        email: 'patient1@dentia.local',
+      }),
+    ).rejects.toThrow(HttpException);
+
+    expect(usersRepository.save).not.toHaveBeenCalled();
+    expect(mailService.sendPasswordResetCode).not.toHaveBeenCalled();
+  });
+
+  it('resetPassword debe fallar si no hay codigo activo', async () => {
+    usersRepository.findOne.mockResolvedValueOnce({
+      id: 'u1',
+      email: 'patient1@dentia.local',
+      role: UserRole.PATIENT,
+      domainId: 'p1',
+      isActive: true,
+      emailVerified: true,
+      passwordResetCodeHash: null,
+      passwordResetExpiresAt: null,
+    });
+
+    await expect(
+      service.resetPassword({
+        email: 'patient1@dentia.local',
+        code: '123456',
+        password: 'NewPassword123',
+      }),
+    ).rejects.toThrow(HttpException);
+
+    expect(bcrypt.compare).not.toHaveBeenCalled();
+    expect(usersRepository.save).not.toHaveBeenCalled();
+  });
+
+  it('resetPassword debe fallar si el codigo expiro', async () => {
+    usersRepository.findOne.mockResolvedValueOnce({
+      id: 'u1',
+      email: 'patient1@dentia.local',
+      role: UserRole.PATIENT,
+      domainId: 'p1',
+      isActive: true,
+      emailVerified: true,
+      passwordResetCodeHash: 'reset-hash',
+      passwordResetExpiresAt: new Date(Date.now() - 1000),
+      passwordResetAttempts: 0,
+      passwordResetLockedUntil: null,
+    });
+
+    await expect(
+      service.resetPassword({
+        email: 'patient1@dentia.local',
+        code: '123456',
+        password: 'NewPassword123',
+      }),
+    ).rejects.toThrow('Codigo de recuperacion expirado');
+
+    expect(bcrypt.compare).not.toHaveBeenCalled();
+    expect(usersRepository.save).not.toHaveBeenCalled();
+  });
+
+  it('resetPassword debe incrementar intentos si el codigo es incorrecto', async () => {
+    const user = {
+      id: 'u1',
+      email: 'patient1@dentia.local',
+      role: UserRole.PATIENT,
+      domainId: 'p1',
+      isActive: true,
+      emailVerified: true,
+      passwordResetCodeHash: 'reset-hash',
+      passwordResetExpiresAt: new Date(Date.now() + 10 * 60 * 1000),
+      passwordResetAttempts: 0,
+      passwordResetLockedUntil: null,
+    };
+
+    usersRepository.findOne.mockResolvedValueOnce(user);
+    usersRepository.save.mockImplementation(async (savedUser: any) => savedUser);
+    (bcrypt.compare as jest.Mock).mockResolvedValueOnce(false);
+
+    await expect(
+      service.resetPassword({
+        email: 'patient1@dentia.local',
+        code: '000000',
+        password: 'NewPassword123',
+      }),
+    ).rejects.toThrow(UnauthorizedException);
+
+    expect(user.passwordResetAttempts).toBe(1);
+    expect(user.passwordResetLockedUntil).toBeNull();
+    expect(usersRepository.save).toHaveBeenCalledWith(user);
+  });
+
+  it('resetPassword debe bloquear al llegar al maximo de intentos incorrectos', async () => {
+    const user = {
+      id: 'u1',
+      email: 'patient1@dentia.local',
+      role: UserRole.PATIENT,
+      domainId: 'p1',
+      isActive: true,
+      emailVerified: true,
+      passwordResetCodeHash: 'reset-hash',
+      passwordResetExpiresAt: new Date(Date.now() + 10 * 60 * 1000),
+      passwordResetAttempts: 4,
+      passwordResetLockedUntil: null,
+    };
+
+    usersRepository.findOne.mockResolvedValueOnce(user);
+    usersRepository.save.mockImplementation(async (savedUser: any) => savedUser);
+    (bcrypt.compare as jest.Mock).mockResolvedValueOnce(false);
+
+    await expect(
+      service.resetPassword({
+        email: 'patient1@dentia.local',
+        code: '000000',
+        password: 'NewPassword123',
+      }),
+    ).rejects.toThrow(HttpException);
+
+    expect(user.passwordResetAttempts).toBe(5);
+    expect(user.passwordResetLockedUntil).toBeInstanceOf(Date);
+    expect(usersRepository.save).toHaveBeenCalledWith(user);
+  });
 });

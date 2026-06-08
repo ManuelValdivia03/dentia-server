@@ -5,7 +5,7 @@ using MongoDB.Driver;
 
 namespace FilesService.Services;
 
-public class FileMetadataService
+public class FileMetadataService : IFileMetadataService
 {
     private readonly IMongoCollection<ClinicalFile> _collection;
     public FileMetadataService(IOptions<MongoSettings> settings)

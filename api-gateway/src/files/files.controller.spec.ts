@@ -1,4 +1,8 @@
-import { BadRequestException } from '@nestjs/common';
+import {
+  BadRequestException,
+  StreamableFile,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { FilesController } from './files.controller';
 
 describe('FilesController', () => {
@@ -112,5 +116,66 @@ describe('FilesController', () => {
       deleted: true,
       id: 'file1',
     });
+  });
+
+  it('delegates download to FilesService and returns StreamableFile', async () => {
+    const stream = Buffer.from('fake-file');
+
+    const res = {
+      setHeader: jest.fn(),
+    };
+
+    filesServiceMock.download.mockResolvedValue({
+      stream,
+      headers: {
+        'content-type': 'application/pdf',
+        'content-disposition': 'attachment; filename="test.pdf"',
+      },
+    });
+
+    const result = await controller.download('file1', req, res as any);
+
+    expect(filesServiceMock.download).toHaveBeenCalledWith(
+      'file1',
+      req.headers.authorization,
+    );
+
+    expect(res.setHeader).toHaveBeenCalledWith('Content-Type', 'application/pdf');
+    expect(res.setHeader).toHaveBeenCalledWith(
+      'Content-Disposition',
+      'attachment; filename="test.pdf"',
+    );
+
+    expect(result).toBeInstanceOf(StreamableFile);
+  });
+
+  it('findAll throws UnauthorizedException when Authorization header is missing', () => {
+    const reqWithoutAuth = {
+      ...req,
+      headers: {},
+    };
+
+    expect(() => controller.findAll({}, reqWithoutAuth as any)).toThrow(
+      UnauthorizedException,
+    );
+
+    expect(filesServiceMock.findAll).not.toHaveBeenCalled();
+  });
+
+  it('download throws UnauthorizedException when Authorization header is missing', async () => {
+    const reqWithoutAuth = {
+      ...req,
+      headers: {},
+    };
+
+    const res = {
+      setHeader: jest.fn(),
+    };
+
+    await expect(
+      controller.download('file1', reqWithoutAuth as any, res as any),
+    ).rejects.toThrow(UnauthorizedException);
+
+    expect(filesServiceMock.download).not.toHaveBeenCalled();
   });
 });

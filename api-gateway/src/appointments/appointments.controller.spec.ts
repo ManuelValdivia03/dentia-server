@@ -2,6 +2,7 @@
 
 import { AppointmentsController } from './appointments.controller';
 import { AppointmentsService } from './appointments.service';
+import { UnauthorizedException } from '@nestjs/common';
 import { UserRole } from '../auth/enums/user-role.enum';
 
 describe('AppointmentsController', () => {
@@ -25,16 +26,17 @@ describe('AppointmentsController', () => {
   ];
 
   beforeEach(() => {
-    service = {
-      findAll: jest.fn(),
-      findOne: jest.fn(),
-      getAvailability: jest.fn(),
-      create: jest.fn(),
-      reschedule: jest.fn(),
-      cancel: jest.fn(),
-      confirm: jest.fn(),
-      complete: jest.fn(),
-    } as any;
+  service = {
+    findAll: jest.fn(),
+    findOne: jest.fn(),
+    getAvailability: jest.fn(),
+    create: jest.fn(),
+    reschedule: jest.fn(),
+    cancel: jest.fn(),
+    confirm: jest.fn(),
+    complete: jest.fn(),
+    createRating: jest.fn(),
+  } as any;
 
     controller = new AppointmentsController(service);
   });
@@ -211,5 +213,198 @@ describe('AppointmentsController', () => {
 
     expect(service.findOne).toHaveBeenCalledWith('a2', authorization);
     expect(result).toEqual(appointment);
+  });
+
+  it('getAvailability debe delegar dentistId, date y Authorization header', async () => {
+    const req: any = {
+      headers: { authorization },
+      user: {
+        sub: 'u1',
+        role: UserRole.PATIENT,
+        domainId: 'p1',
+        email: 'patient1@dentia.local',
+      },
+    };
+
+    const availability = {
+      dentistId: 'd1',
+      date: '2026-06-01',
+      slots: ['10:00', '11:00'],
+    };
+
+    service.getAvailability.mockResolvedValueOnce(availability as any);
+
+    const result = await controller.getAvailability('d1', '2026-06-01', req);
+
+    expect(service.getAvailability).toHaveBeenCalledWith(
+      'd1',
+      '2026-06-01',
+      authorization,
+    );
+    expect(result).toEqual(availability);
+  });
+
+  it('findByDay debe delegar date, dentistId opcional y Authorization header', async () => {
+    const req: any = {
+      headers: { authorization },
+      user: {
+        sub: 'u2',
+        role: UserRole.DENTIST,
+        domainId: 'd1',
+        email: 'dentist1@dentia.local',
+      },
+    };
+
+    const dayAgenda = [
+      {
+        id: 'a1',
+        patientId: 'p1',
+        dentistId: 'd1',
+        status: 'CONFIRMED',
+      },
+    ];
+
+    service.findByDay = jest.fn().mockResolvedValueOnce(dayAgenda as any);
+
+    const result = await controller.findByDay('2026-06-01', undefined, req);
+
+    expect(service.findByDay).toHaveBeenCalledWith(
+      '2026-06-01',
+      undefined,
+      authorization,
+    );
+    expect(result).toEqual(dayAgenda);
+  });
+
+  it('reschedule debe delegar id, dto y Authorization header', async () => {
+    const req: any = {
+      headers: { authorization },
+      user: {
+        sub: 'u1',
+        role: UserRole.PATIENT,
+        domainId: 'p1',
+        email: 'patient1@dentia.local',
+      },
+    };
+
+    const dto: any = {
+      startAt: '2026-06-01T15:00:00.000Z',
+      endAt: '2026-06-01T16:00:00.000Z',
+      reason: 'Cambio de horario',
+    };
+
+    const appointment = {
+      id: 'a1',
+      patientId: 'p1',
+      dentistId: 'd1',
+      status: 'PENDING',
+      ...dto,
+    };
+
+    service.reschedule.mockResolvedValueOnce(appointment as any);
+
+    const result = await controller.reschedule('a1', dto, req);
+
+    expect(service.reschedule).toHaveBeenCalledWith('a1', dto, authorization);
+    expect(result).toEqual(appointment);
+  });
+
+  it('cancel debe delegar id y Authorization header', async () => {
+    const req: any = {
+      headers: { authorization },
+      user: {
+        sub: 'u1',
+        role: UserRole.PATIENT,
+        domainId: 'p1',
+        email: 'patient1@dentia.local',
+      },
+    };
+
+    const appointment = {
+      id: 'a1',
+      patientId: 'p1',
+      dentistId: 'd1',
+      status: 'CANCELLED',
+    };
+
+    service.cancel.mockResolvedValueOnce(appointment as any);
+
+    const result = await controller.cancel('a1', req);
+
+    expect(service.cancel).toHaveBeenCalledWith('a1', authorization);
+    expect(result).toEqual(appointment);
+  });
+
+  it('complete debe delegar id y Authorization header', async () => {
+    const req: any = {
+      headers: { authorization },
+      user: {
+        sub: 'u2',
+        role: UserRole.DENTIST,
+        domainId: 'd1',
+        email: 'dentist1@dentia.local',
+      },
+    };
+
+    const appointment = {
+      id: 'a1',
+      patientId: 'p1',
+      dentistId: 'd1',
+      status: 'COMPLETED',
+    };
+
+    service.complete.mockResolvedValueOnce(appointment as any);
+
+    const result = await controller.complete('a1', req);
+
+    expect(service.complete).toHaveBeenCalledWith('a1', authorization);
+    expect(result).toEqual(appointment);
+  });
+
+  it('createRating debe delegar id, dto y Authorization header', async () => {
+    const req: any = {
+      headers: { authorization },
+      user: {
+        sub: 'u1',
+        role: UserRole.PATIENT,
+        domainId: 'p1',
+        email: 'patient1@dentia.local',
+      },
+    };
+
+    const dto: any = {
+      score: 5,
+      comment: 'Excelente atención',
+    };
+
+    const rating = {
+      id: 'r1',
+      appointmentId: 'a1',
+      patientId: 'p1',
+      dentistId: 'd1',
+      ...dto,
+    };
+
+    service.createRating.mockResolvedValueOnce(rating as any);
+
+    const result = await controller.createRating('a1', dto, req);
+
+    expect(service.createRating).toHaveBeenCalledWith('a1', dto, authorization);
+    expect(result).toEqual(rating);
+  });
+
+  it('findOne debe lanzar UnauthorizedException si falta Authorization header', () => {
+    const req: any = {
+      headers: {},
+      user: {
+        sub: 'u3',
+        role: UserRole.ADMIN,
+        domainId: 'admin1',
+        email: 'admin@dentia.local',
+      },
+    };
+
+    expect(() => controller.findOne('a1', req)).toThrow(UnauthorizedException);
+    expect(service.findOne).not.toHaveBeenCalled();
   });
 });

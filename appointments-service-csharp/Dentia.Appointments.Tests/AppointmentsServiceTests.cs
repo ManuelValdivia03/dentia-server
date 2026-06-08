@@ -254,8 +254,8 @@ public class AppointmentsServiceTests
                 {
                     PatientId = "p1",
                     DentistId = "d1",
-                    StartAt = DateTime.UtcNow.AddMinutes(-30),
-                    EndAt = DateTime.UtcNow.AddMinutes(30),
+                    StartAt = AppointmentTime.Now().AddMinutes(-30),
+                    EndAt = AppointmentTime.Now().AddMinutes(30),
                     Reason = "Fecha pasada"
                 },
                 Patient("p1")
@@ -293,8 +293,8 @@ public class AppointmentsServiceTests
                 appointmentId,
                 new RescheduleAppointmentDto
                 {
-                    StartAt = DateTime.UtcNow.AddMinutes(-30),
-                    EndAt = DateTime.UtcNow.AddMinutes(30)
+                    StartAt = AppointmentTime.Now().AddMinutes(-30),
+                    EndAt = AppointmentTime.Now().AddMinutes(30)
                 },
                 Patient("p1")
             )
@@ -887,5 +887,209 @@ public class AppointmentsServiceTests
         Assert.Equal(AppointmentStatus.CANCELLED, appointment!.Status);
         Assert.Single(reportsClient.SnapshotsSent);
         Assert.Single(eventsPublisher.CancelledEvents);
+    }
+
+    [Fact]
+    public async Task CreateAsync_ShouldThrow403_WhenPatientCreatesAppointmentForAnotherPatient()
+    {
+        await using var db = CreateDbContext();
+        var service = CreateService(db);
+
+        var ex = await Assert.ThrowsAsync<AppException>(() =>
+            service.CreateAsync(
+                new CreateAppointmentDto
+                {
+                    PatientId = "p2",
+                    DentistId = "d1",
+                    StartAt = FutureDate(7),
+                    EndAt = FutureDate(7, 11),
+                    Reason = "Intento no permitido"
+                },
+                Patient("p1")
+            )
+        );
+
+        Assert.Equal(403, ex.StatusCode);
+        Assert.Equal("Patient can only create appointments for themselves", ex.Message);
+        Assert.Empty(db.Appointments);
+    }
+
+    [Fact]
+    public async Task FindOneAsync_ShouldThrow403_WhenPatientTriesToAccessAnotherPatientAppointment()
+    {
+        await using var db = CreateDbContext();
+
+        var appointmentId = Guid.NewGuid();
+
+        db.Appointments.Add(new Appointment
+        {
+            Id = appointmentId,
+            PatientId = "p2",
+            DentistId = "d1",
+            StartAt = FutureDate(5),
+            EndAt = FutureDate(5, 11),
+            Status = AppointmentStatus.PENDING,
+            Reason = "Cita ajena"
+        });
+
+        await db.SaveChangesAsync();
+
+        var service = CreateService(db);
+
+        var ex = await Assert.ThrowsAsync<AppException>(() =>
+            service.FindOneAsync(appointmentId, Patient("p1"))
+        );
+
+        Assert.Equal(403, ex.StatusCode);
+        Assert.Equal("Access denied", ex.Message);
+    }
+
+    [Fact]
+    public async Task RescheduleAsync_ShouldThrow409_WhenNewSlotOverlapsConfirmedAppointment()
+    {
+        await using var db = CreateDbContext();
+
+        var appointmentToRescheduleId = Guid.NewGuid();
+
+        db.Appointments.AddRange(
+            new Appointment
+            {
+                Id = appointmentToRescheduleId,
+                PatientId = "p1",
+                DentistId = "d1",
+                StartAt = FutureDate(8),
+                EndAt = FutureDate(8, 11),
+                Status = AppointmentStatus.PENDING,
+                Reason = "Cita a mover"
+            },
+            new Appointment
+            {
+                Id = Guid.NewGuid(),
+                PatientId = "p2",
+                DentistId = "d1",
+                StartAt = FutureDate(9),
+                EndAt = FutureDate(9, 11),
+                Status = AppointmentStatus.CONFIRMED,
+                Reason = "Cita confirmada"
+            }
+        );
+
+        await db.SaveChangesAsync();
+
+        var service = CreateService(db);
+
+        var ex = await Assert.ThrowsAsync<AppException>(() =>
+            service.RescheduleAsync(
+                appointmentToRescheduleId,
+                new RescheduleAppointmentDto
+                {
+                    StartAt = FutureDate(9).AddMinutes(30),
+                    EndAt = FutureDate(9, 11).AddMinutes(30),
+                    Reason = "Empalmada"
+                },
+                Patient("p1")
+            )
+        );
+
+        Assert.Equal(409, ex.StatusCode);
+        Assert.Equal("Dentist already has an appointment in this time range", ex.Message);
+    }
+
+    [Fact]
+    public async Task CompleteAsync_ShouldThrow403_WhenRequesterIsPatient()
+    {
+        await using var db = CreateDbContext();
+
+        var appointmentId = Guid.NewGuid();
+
+        db.Appointments.Add(new Appointment
+        {
+            Id = appointmentId,
+            PatientId = "p1",
+            DentistId = "d1",
+            StartAt = DateTime.SpecifyKind(DateTime.UtcNow.AddHours(-2), DateTimeKind.Unspecified),
+            EndAt = DateTime.SpecifyKind(DateTime.UtcNow.AddHours(-1), DateTimeKind.Unspecified),
+            Status = AppointmentStatus.CONFIRMED,
+            Reason = "Cita pasada"
+        });
+
+        await db.SaveChangesAsync();
+
+        var service = CreateService(db);
+
+        var ex = await Assert.ThrowsAsync<AppException>(() =>
+            service.CompleteAsync(appointmentId, Patient("p1"))
+        );
+
+        Assert.Equal(403, ex.StatusCode);
+        Assert.Equal("Only admin or assigned dentist can complete", ex.Message);
+    }
+
+    [Fact]
+    public async Task FindPreviousDentistIdsAsync_ShouldReturnDistinctNonCancelledDentistsForPatient()
+    {
+        await using var db = CreateDbContext();
+
+        db.Appointments.AddRange(
+            new Appointment
+            {
+                Id = Guid.NewGuid(),
+                PatientId = "p1",
+                DentistId = "d1",
+                StartAt = DateTime.Parse("2026-05-01T10:00:00"),
+                EndAt = DateTime.Parse("2026-05-01T11:00:00"),
+                Status = AppointmentStatus.COMPLETED
+            },
+            new Appointment
+            {
+                Id = Guid.NewGuid(),
+                PatientId = "p1",
+                DentistId = "d1",
+                StartAt = DateTime.Parse("2026-05-02T10:00:00"),
+                EndAt = DateTime.Parse("2026-05-02T11:00:00"),
+                Status = AppointmentStatus.CONFIRMED
+            },
+            new Appointment
+            {
+                Id = Guid.NewGuid(),
+                PatientId = "p1",
+                DentistId = "d2",
+                StartAt = DateTime.Parse("2026-05-03T10:00:00"),
+                EndAt = DateTime.Parse("2026-05-03T11:00:00"),
+                Status = AppointmentStatus.CANCELLED
+            },
+            new Appointment
+            {
+                Id = Guid.NewGuid(),
+                PatientId = "p2",
+                DentistId = "d3",
+                StartAt = DateTime.Parse("2026-05-04T10:00:00"),
+                EndAt = DateTime.Parse("2026-05-04T11:00:00"),
+                Status = AppointmentStatus.COMPLETED
+            }
+        );
+
+        await db.SaveChangesAsync();
+
+        var service = CreateService(db);
+
+        var result = await service.FindPreviousDentistIdsAsync(Patient("p1"));
+
+        Assert.Single(result);
+        Assert.Equal("d1", result[0]);
+    }
+
+    [Fact]
+    public async Task FindPreviousDentistIdsAsync_ShouldThrow403_WhenRequesterIsNotPatient()
+    {
+        await using var db = CreateDbContext();
+        var service = CreateService(db);
+
+        var ex = await Assert.ThrowsAsync<AppException>(() =>
+            service.FindPreviousDentistIdsAsync(Dentist("d1"))
+        );
+
+        Assert.Equal(403, ex.StatusCode);
+        Assert.Equal("Only patients can access previous dentists", ex.Message);
     }
 }

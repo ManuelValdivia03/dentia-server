@@ -402,11 +402,25 @@ curl -L -X GET "http://localhost:3000/reports/export/appointments-by-status?doct
 
 ---
 
-## Pendientes conocidos
+# Ejecutar pruebas unitarias
 
-* Mejorar pruebas e2e por gateway.
-* Evaluar WebSocket para chat si sobra tiempo.
-* Reforzar gestión de secretos para producción.
-* Sustituir `EnsureCreated`/`synchronize` por migraciones formales donde aplique.
-* Mejorar diseño visual de PDFs.
-* Corregir valores hardcodeados restantes en `docker-compose.yml`, como credenciales de RabbitMQ/Neo4j en entorno de desarrollo.
+appointments-service-csharp:
+dotnet test appointments-service-csharp/Dentia.Appointments.Tests/Dentia.Appointments.Tests.csproj
+
+auth-service:
+cd auth-service && npm run test
+
+prescriptions-service:
+cd prescriptions-service && npm run test
+
+files-service-csharp:
+dotnet test files-service-csharp/FilesService.Tests/FilesService.Tests.csproj
+
+chat-service-csharp:
+dotnet test chat-service-csharp/ChatService.Tests/ChatService.Tests.csproj
+
+reports-service:
+cd reports-service && py -m pytest
+
+api-gateway:
+cd api-gateway && npm run test
