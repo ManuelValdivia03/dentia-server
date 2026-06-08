@@ -234,4 +234,172 @@ public class ChatMessagingServiceTests
 
         Assert.True(repo.Conversations[0].LastReadAt.ContainsKey("p1"));
     }
+
+    [Fact]
+    public async Task ListConversations_Dentist_ReturnsOnlyOwn()
+    {
+        var (service, repo, _) = CreateService();
+
+        SeedConversation(repo, "p1", "d1");
+        SeedConversation(repo, "p2", "d2");
+
+        var result = await service.ListConversationsAsync(Dentist("d1"));
+
+        Assert.Single(result);
+        Assert.Equal("d1", result[0].DentistId);
+    }
+
+    [Fact]
+    public async Task CreateConversation_DentistForeignDentistId_Throws403()
+    {
+        var (service, _, _) = CreateService();
+
+        var dto = new CreateConversationDto
+        {
+            PatientId = "p1",
+            DentistId = "d2"
+        };
+
+        var ex = await Assert.ThrowsAsync<AppException>(() =>
+            service.CreateConversationAsync(dto, Dentist("d1")));
+
+        Assert.Equal(403, ex.StatusCode);
+        Assert.Equal("Dentist can only open own conversations", ex.Message);
+    }
+
+    [Fact]
+    public async Task CreateConversation_AdminCanCreateConversation_WhenRelationIsValid()
+    {
+        var (service, repo, relation) = CreateService();
+        relation.Allowed = true;
+
+        var dto = new CreateConversationDto
+        {
+            PatientId = "p1",
+            DentistId = "d1"
+        };
+
+        var result = await service.CreateConversationAsync(dto, Admin());
+
+        Assert.NotNull(result.Id);
+        Assert.Equal("p1", result.PatientId);
+        Assert.Equal("d1", result.DentistId);
+        Assert.True(result.IsActive);
+        Assert.Single(repo.Conversations);
+        Assert.Equal(1, relation.Calls);
+    }
+
+    [Fact]
+    public async Task SendMessage_AdminParticipantCanReadButCannotSend_Throws403()
+    {
+        var (service, repo, _) = CreateService();
+        var conversation = SeedConversation(repo, "p1", "d1");
+
+        var messages = await service.ListMessagesAsync(
+            conversation.Id!,
+            Admin(),
+            30,
+            null
+        );
+
+        Assert.Empty(messages);
+
+        var ex = await Assert.ThrowsAsync<AppException>(() =>
+            service.SendMessageAsync(
+                conversation.Id!,
+                new SendMessageDto { Body = "mensaje admin" },
+                Admin()
+            )
+        );
+
+        Assert.Equal(403, ex.StatusCode);
+        Assert.Equal("Only patient or dentist can send messages", ex.Message);
+    }
+
+    [Fact]
+    public async Task SendMessage_LongText_ShouldTrimPreviewTo120Characters()
+    {
+        var (service, repo, _) = CreateService();
+        var conversation = SeedConversation(repo, "p1", "d1");
+        var longText = new string('a', 150);
+
+        var message = await service.SendMessageAsync(
+            conversation.Id!,
+            new SendMessageDto { Body = longText },
+            Patient("p1")
+        );
+
+        Assert.Equal(longText, message.Body);
+        Assert.Equal(120, repo.Conversations[0].LastMessagePreview.Length);
+        Assert.Equal(new string('a', 120), repo.Conversations[0].LastMessagePreview);
+    }
+
+    [Fact]
+    public async Task SendMessage_PdfAttachment_CurrentlyFallsBackToImageType()
+    {
+        var (service, repo, _) = CreateService();
+        var conversation = SeedConversation(repo, "p1", "d1");
+
+        var message = await service.SendMessageAsync(
+            conversation.Id!,
+            new SendMessageDto
+            {
+                Attachment = new AttachmentDto
+                {
+                    FileId = "pdf-1",
+                    ContentType = "application/pdf",
+                    OriginalName = "receta.pdf",
+                    Size = 2048,
+                }
+            },
+            Patient("p1")
+        );
+
+        Assert.Equal(MessageTypes.Image, message.Type);
+        Assert.NotNull(message.Attachment);
+        Assert.Equal("application/pdf", message.Attachment!.ContentType);
+        Assert.Equal("📷 Imagen", repo.Conversations[0].LastMessagePreview);
+    }
+
+    [Fact]
+    public async Task MarkAsRead_NonParticipant_Throws403()
+    {
+        var (service, repo, _) = CreateService();
+        var conversation = SeedConversation(repo, "p1", "d1");
+
+        var ex = await Assert.ThrowsAsync<AppException>(() =>
+            service.MarkAsReadAsync(conversation.Id!, Patient("intruder")));
+
+        Assert.Equal(403, ex.StatusCode);
+        Assert.False(repo.Conversations[0].LastReadAt.ContainsKey("intruder"));
+    }
+
+    [Fact]
+    public async Task ListMessages_ShouldRespectLimit()
+    {
+        var (service, repo, _) = CreateService();
+        var conversation = SeedConversation(repo, "p1", "d1");
+
+        repo.Messages.AddRange(
+            Enumerable.Range(1, 5).Select(index => new Message
+            {
+                Id = MongoDB.Bson.ObjectId.GenerateNewId().ToString(),
+                ConversationId = conversation.Id!,
+                SenderId = "p1",
+                SenderRole = UserRoles.Patient,
+                Body = $"mensaje {index}",
+                Type = MessageTypes.Text,
+                CreatedAt = DateTime.UtcNow.AddMinutes(index),
+            })
+        );
+
+        var result = await service.ListMessagesAsync(
+            conversation.Id!,
+            Patient("p1"),
+            2,
+            null
+        );
+
+        Assert.Equal(2, result.Count);
+    }
 }
