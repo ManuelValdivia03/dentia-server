@@ -7,8 +7,6 @@ public interface IAppointmentsRelationClient
     Task<bool> HasPatientDentistRelationAsync(string patientId, string dentistId);
 }
 
-// Calls appointments-service to confirm a patient and dentist are linked,
-// using the shared internal API key. Mirrors files-service's relation check.
 public class AppointmentsRelationClient : IAppointmentsRelationClient
 {
     private readonly HttpClient _httpClient;

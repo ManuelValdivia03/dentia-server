@@ -27,7 +27,6 @@ public class Conversation
     [BsonIgnoreIfNull]
     public DateTime? LastMessageAt { get; set; }
 
-    // Maps each participant userId to the timestamp they last read the conversation.
     [BsonElement("lastReadAt")]
     public Dictionary<string, DateTime> LastReadAt { get; set; } = new();
 

@@ -2,7 +2,6 @@ using System.ComponentModel.DataAnnotations;
 
 namespace ChatService.DTOs;
 
-// Sent by the gateway after it uploads the binary to files-service.
 public class AttachmentDto
 {
     [Required]

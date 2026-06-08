@@ -8,7 +8,6 @@ using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Allow uploads up to 50 MB (images + short videos). Kestrel defaults to 30 MB.
 const long maxUploadBytes = 52_428_800;
 
 builder.WebHost.ConfigureKestrel(options =>

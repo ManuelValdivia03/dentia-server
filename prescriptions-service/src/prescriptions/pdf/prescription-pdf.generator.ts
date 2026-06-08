@@ -216,7 +216,6 @@ class PdfBuilder {
     height: number,
     options: PdfBoxOptions = {},
   ) {
-    // PDF manual sin curvas complejas: caja rectangular limpia.
     this.rect(x, y, width, height, options);
   }
 

@@ -7,8 +7,6 @@ public interface ICurrentUserService
     CurrentUser Get();
 }
 
-// Trusts the identity headers forwarded by the API gateway (x-user-id / x-user-role).
-// Mirrors the NestJS InternalAuthGuard + @CurrentUser() decorator. No JWT validation here.
 public class CurrentUserService : ICurrentUserService
 {
     private readonly IHttpContextAccessor _httpContextAccessor;

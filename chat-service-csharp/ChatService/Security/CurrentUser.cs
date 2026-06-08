@@ -3,7 +3,7 @@ namespace ChatService.Security;
 public class CurrentUser
 {
     public string Id { get; init; } = string.Empty;
-    public string Role { get; init; } = string.Empty; // PATIENT | DENTIST | ADMIN
+    public string Role { get; init; } = string.Empty;
 }
 
 public static class UserRoles

@@ -73,7 +73,6 @@ try {
                 break
             }
         } catch {
-            # Services are still starting.
         }
 
         Start-Sleep -Seconds 2

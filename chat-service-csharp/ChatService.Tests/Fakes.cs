@@ -4,7 +4,6 @@ using MongoDB.Bson;
 
 namespace ChatService.Tests;
 
-// In-memory IChatRepository so ChatMessagingService logic can be tested without Mongo.
 public class FakeChatRepository : IChatRepository
 {
     public List<Conversation> Conversations { get; } = new();

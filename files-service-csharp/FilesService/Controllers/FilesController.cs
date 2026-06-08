@@ -21,7 +21,7 @@ public class FilesController : ControllerBase
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IConfiguration _configuration;
 
-    private const long MaxUploadBytes = 52_428_800; // 50 MB
+    private const long MaxUploadBytes = 52_428_800;
 
     private static readonly string[] AllowedContentTypes =
     {

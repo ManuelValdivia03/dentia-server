@@ -7,7 +7,6 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.Configure<MongoSettings>(builder.Configuration.GetSection("Mongo"));
 
-// Mongo access is process-wide; a single repository holds the collections.
 builder.Services.AddSingleton<IChatRepository, ChatRepository>();
 
 builder.Services.AddHttpContextAccessor();

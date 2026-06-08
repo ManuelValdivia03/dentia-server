@@ -1,6 +1,3 @@
--- Adds the profile fields expected by auth-service in production.
--- Run this against the dentia_auth database.
-
 ALTER TABLE "users"
   ADD COLUMN IF NOT EXISTS "specialty" varchar(120),
   ADD COLUMN IF NOT EXISTS "cedulaProfesional" varchar(60),

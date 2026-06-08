@@ -1,6 +1,3 @@
--- Creates the refresh session table expected by auth-service in production.
--- Run this against the dentia_auth database.
-
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 CREATE TABLE IF NOT EXISTS "refresh_sessions" (
@@ -19,4 +16,3 @@ CREATE INDEX IF NOT EXISTS "IDX_refresh_sessions_userId"
 
 CREATE UNIQUE INDEX IF NOT EXISTS "IDX_refresh_sessions_tokenHash"
   ON "refresh_sessions" ("tokenHash");
-

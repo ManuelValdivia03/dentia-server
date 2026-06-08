@@ -72,7 +72,6 @@ public class ExpiredAppointmentsBackgroundService : BackgroundService
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {
-            // App is shutting down.
         }
         catch (Exception ex)
         {

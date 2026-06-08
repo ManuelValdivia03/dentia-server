@@ -15,8 +15,6 @@ public class ChatRepository : IChatRepository
     {
         var settings = options.Value;
 
-        // The legacy NestJS service was configured via MONGODB_URI (connection string
-        // with the database name embedded). Keep reading it so dev/prod env stay unchanged.
         var uri = configuration["MONGODB_URI"];
 
         MongoUrl? mongoUrl = string.IsNullOrWhiteSpace(uri) ? null : new MongoUrl(uri);

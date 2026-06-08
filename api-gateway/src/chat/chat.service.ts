@@ -59,7 +59,6 @@ export class ChatService {
       payload.body = body.body;
     }
 
-    // Reuse files-service to store the binary; the chat message only carries a reference.
     if (file) {
       if (!authorization) {
         throw new HttpException('Authorization header is required', 401);

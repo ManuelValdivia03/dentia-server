@@ -18,10 +18,10 @@ public class Message
     public string SenderId { get; set; } = string.Empty;
 
     [BsonElement("senderRole")]
-    public string SenderRole { get; set; } = string.Empty; // PATIENT | DENTIST
+    public string SenderRole { get; set; } = string.Empty;
 
     [BsonElement("type")]
-    public string Type { get; set; } = MessageTypes.Text; // TEXT | IMAGE | VIDEO
+    public string Type { get; set; } = MessageTypes.Text;
 
     [BsonElement("body")]
     [BsonIgnoreIfNull]
