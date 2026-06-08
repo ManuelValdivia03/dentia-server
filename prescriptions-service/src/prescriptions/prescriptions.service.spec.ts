@@ -205,4 +205,308 @@ describe('PrescriptionsService', () => {
     expect(repository.save).toHaveBeenCalledWith(createdPrescription);
     expect(result).toEqual(savedPrescription);
   });
+
+  it('findAll debe filtrar recetas activas por paciente', async () => {
+    repository.find.mockResolvedValue([
+      {
+        id: 'rx-1',
+        appointmentId: 'appointment-1',
+        patientId: 'p1',
+        dentistId: 'd1',
+        diagnosis: 'Dx',
+        indications: 'Indicaciones',
+        notes: null,
+        status: PrescriptionStatus.ACTIVE,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      } as Prescription,
+    ]);
+
+    const result = await service.findAll(patientRequester);
+
+    expect(repository.find).toHaveBeenCalledWith({
+      where: {
+        status: PrescriptionStatus.ACTIVE,
+        patientId: 'p1',
+      },
+      order: { createdAt: 'DESC' },
+    });
+
+    expect(result).toHaveLength(1);
+    expect(result[0].patientId).toBe('p1');
+  });
+
+  it('findAll debe filtrar recetas activas por dentista', async () => {
+    repository.find.mockResolvedValue([
+      {
+        id: 'rx-1',
+        appointmentId: 'appointment-1',
+        patientId: 'p1',
+        dentistId: 'd1',
+        diagnosis: 'Dx',
+        indications: 'Indicaciones',
+        notes: null,
+        status: PrescriptionStatus.ACTIVE,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      } as Prescription,
+    ]);
+
+    const result = await service.findAll(dentistRequester);
+
+    expect(repository.find).toHaveBeenCalledWith({
+      where: {
+        status: PrescriptionStatus.ACTIVE,
+        dentistId: 'd1',
+      },
+      order: { createdAt: 'DESC' },
+    });
+
+    expect(result).toHaveLength(1);
+    expect(result[0].dentistId).toBe('d1');
+  });
+
+  it('findAll debe permitir admin sin filtrar por paciente o dentista', async () => {
+    repository.find.mockResolvedValue([
+      {
+        id: 'rx-1',
+        appointmentId: 'appointment-1',
+        patientId: 'p1',
+        dentistId: 'd1',
+        diagnosis: 'Dx',
+        indications: 'Indicaciones',
+        notes: null,
+        status: PrescriptionStatus.ACTIVE,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      } as Prescription,
+    ]);
+
+    const result = await service.findAll(adminRequester);
+
+    expect(repository.find).toHaveBeenCalledWith({
+      where: {
+        status: PrescriptionStatus.ACTIVE,
+      },
+      order: { createdAt: 'DESC' },
+    });
+
+    expect(result).toHaveLength(1);
+  });
+
+  it('findAll debe rechazar rol no permitido', async () => {
+    await expect(
+      service.findAll({
+        sub: 'u-unknown',
+        role: 'RECEPTIONIST' as any,
+        domainId: 'r1',
+        email: 'reception@dentia.local',
+      }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(repository.find).not.toHaveBeenCalled();
+  });
+
+  it('findOne debe regresar receta si requester es admin', async () => {
+    const prescription = {
+      id: 'rx-1',
+      appointmentId: 'appointment-1',
+      patientId: 'p1',
+      dentistId: 'd1',
+      diagnosis: 'Dx',
+      indications: 'Indicaciones',
+      notes: null,
+      status: PrescriptionStatus.ACTIVE,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    } as Prescription;
+
+    repository.findOne.mockResolvedValue(prescription);
+
+    const result = await service.findOne('rx-1', adminRequester);
+
+    expect(repository.findOne).toHaveBeenCalledWith({
+      where: {
+        id: 'rx-1',
+        status: PrescriptionStatus.ACTIVE,
+      },
+    });
+
+    expect(result).toEqual(prescription);
+  });
+
+  it('findOne debe regresar receta si requester es paciente dueño', async () => {
+    const prescription = {
+      id: 'rx-1',
+      appointmentId: 'appointment-1',
+      patientId: 'p1',
+      dentistId: 'd1',
+      diagnosis: 'Dx',
+      indications: 'Indicaciones',
+      notes: null,
+      status: PrescriptionStatus.ACTIVE,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    } as Prescription;
+
+    repository.findOne.mockResolvedValue(prescription);
+
+    const result = await service.findOne('rx-1', patientRequester);
+
+    expect(result).toEqual(prescription);
+  });
+
+  it('findOne debe regresar receta si requester es dentista dueño', async () => {
+    const prescription = {
+      id: 'rx-1',
+      appointmentId: 'appointment-1',
+      patientId: 'p1',
+      dentistId: 'd1',
+      diagnosis: 'Dx',
+      indications: 'Indicaciones',
+      notes: null,
+      status: PrescriptionStatus.ACTIVE,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    } as Prescription;
+
+    repository.findOne.mockResolvedValue(prescription);
+
+    const result = await service.findOne('rx-1', dentistRequester);
+
+    expect(result).toEqual(prescription);
+  });
+
+  it('findOne debe lanzar error si la receta no existe', async () => {
+    repository.findOne.mockResolvedValue(null);
+
+    await expect(service.findOne('rx-missing', adminRequester)).rejects.toThrow(
+      'Receta no encontrada',
+    );
+  });
+
+  it('findOne debe rechazar paciente ajeno', async () => {
+    repository.findOne.mockResolvedValue({
+      id: 'rx-1',
+      appointmentId: 'appointment-1',
+      patientId: 'p2',
+      dentistId: 'd1',
+      diagnosis: 'Dx',
+      indications: 'Indicaciones',
+      notes: null,
+      status: PrescriptionStatus.ACTIVE,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    } as Prescription);
+
+    await expect(service.findOne('rx-1', patientRequester)).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+  });
+
+  it('findOne debe rechazar dentista ajeno', async () => {
+    repository.findOne.mockResolvedValue({
+      id: 'rx-1',
+      appointmentId: 'appointment-1',
+      patientId: 'p1',
+      dentistId: 'd2',
+      diagnosis: 'Dx',
+      indications: 'Indicaciones',
+      notes: null,
+      status: PrescriptionStatus.ACTIVE,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    } as Prescription);
+
+    await expect(service.findOne('rx-1', dentistRequester)).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+  });
+
+  it('findByAppointment debe regresar solo recetas visibles para el paciente', async () => {
+    repository.find.mockResolvedValue([
+      {
+        id: 'rx-1',
+        appointmentId: 'appointment-1',
+        patientId: 'p1',
+        dentistId: 'd1',
+        diagnosis: 'Dx 1',
+        indications: 'Indicaciones 1',
+        notes: null,
+        status: PrescriptionStatus.ACTIVE,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      } as Prescription,
+      {
+        id: 'rx-2',
+        appointmentId: 'appointment-1',
+        patientId: 'p2',
+        dentistId: 'd1',
+        diagnosis: 'Dx 2',
+        indications: 'Indicaciones 2',
+        notes: null,
+        status: PrescriptionStatus.ACTIVE,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      } as Prescription,
+    ]);
+
+    const result = await service.findByAppointment(
+      'appointment-1',
+      patientRequester,
+    );
+
+    expect(repository.find).toHaveBeenCalledWith({
+      where: {
+        appointmentId: 'appointment-1',
+        status: PrescriptionStatus.ACTIVE,
+      },
+      order: { createdAt: 'ASC' },
+    });
+
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe('rx-1');
+    expect(result[0].patientId).toBe('p1');
+  });
+
+  it('generatePdf debe generar PDF si el paciente tiene acceso', async () => {
+    repository.findOne.mockResolvedValue({
+      id: 'rx-1',
+      appointmentId: 'appointment-1',
+      patientId: 'p1',
+      dentistId: 'd1',
+      diagnosis: 'Gingivitis leve',
+      indications: 'Cepillado tres veces al dia',
+      notes: 'Control en una semana',
+      status: PrescriptionStatus.ACTIVE,
+      createdAt: new Date('2026-06-01T10:00:00.000Z'),
+      updatedAt: new Date('2026-06-01T10:00:00.000Z'),
+    } as Prescription);
+
+    const result = await service.generatePdf('rx-1', patientRequester);
+
+    expect(result.filename).toBe('receta-rx-1.pdf');
+    expect(result.contentType).toBe('application/pdf');
+    expect(result.base64).toEqual(expect.any(String));
+    expect(Buffer.from(result.base64, 'base64').length).toBeGreaterThan(0);
+  });
+
+  it('generatePdf debe rechazar si el paciente no tiene acceso a la receta', async () => {
+    repository.findOne.mockResolvedValue({
+      id: 'rx-1',
+      appointmentId: 'appointment-1',
+      patientId: 'p2',
+      dentistId: 'd1',
+      diagnosis: 'Dx',
+      indications: 'Indicaciones',
+      notes: null,
+      status: PrescriptionStatus.ACTIVE,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    } as Prescription);
+
+    await expect(
+      service.generatePdf('rx-1', patientRequester),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
 });
