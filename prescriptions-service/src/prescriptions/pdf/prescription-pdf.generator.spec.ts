@@ -22,7 +22,7 @@ describe('generatePrescriptionPdf', () => {
     const pdf = Buffer.from(result.base64, 'base64');
     const pdfText = pdf.toString('latin1');
 
-    expect(result.filename).toBe('prescription-rx-1.pdf');
+    expect(result.filename).toBe('receta-rx-1.pdf');
     expect(result.contentType).toBe('application/pdf');
     expect(pdfText.startsWith('%PDF-1.4')).toBe(true);
     expect(pdfText).toContain('Gingivitis leve');
