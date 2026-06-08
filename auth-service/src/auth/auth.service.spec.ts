@@ -767,4 +767,124 @@ describe('AuthService', () => {
       message: 'Contrasena actualizada correctamente',
     });
   });
+
+  it('refresh debe fallar si no recibe refresh token', async () => {
+    await expect(service.refresh()).rejects.toThrow(UnauthorizedException);
+
+    expect(refreshSessionsRepository.findOne).not.toHaveBeenCalled();
+    expect(jwtService.signAsync).not.toHaveBeenCalled();
+  });
+
+  it('refresh debe generar nuevo accessToken y rotar refreshToken si la sesion es valida', async () => {
+    const now = Date.now();
+
+    const session = {
+      id: 'session-1',
+      userId: 'u1',
+      tokenHash: 'old-hash',
+      lastActivityAt: new Date(now),
+      expiresAt: new Date(now + 60 * 60 * 1000),
+      revokedAt: null,
+    };
+
+    const user = {
+      id: 'u1',
+      email: 'patient1@dentia.local',
+      role: UserRole.PATIENT,
+      domainId: 'p1',
+      fullName: 'Paciente Demo',
+      isActive: true,
+      emailVerified: true,
+    };
+
+    refreshSessionsRepository.findOne.mockResolvedValueOnce(session);
+    refreshSessionsRepository.save.mockImplementation(async (saved: any) => saved);
+    usersRepository.findOne.mockResolvedValueOnce(user);
+    jwtService.signAsync.mockResolvedValueOnce('new-access-token');
+
+    const result = await service.refresh('valid-refresh-token');
+
+    expect(refreshSessionsRepository.findOne).toHaveBeenCalled();
+    expect(refreshSessionsRepository.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'session-1',
+        userId: 'u1',
+        tokenHash: expect.any(String),
+        lastActivityAt: expect.any(Date),
+        revokedAt: null,
+      }),
+    );
+
+    expect(jwtService.signAsync).toHaveBeenCalledWith(
+      {
+        sub: 'u1',
+        sid: 'session-1',
+        role: UserRole.PATIENT,
+        domainId: 'p1',
+        email: user.email,
+      },
+      {
+        expiresIn: '2m',
+      },
+    );
+
+    expect(result).toEqual({
+      accessToken: 'new-access-token',
+      refreshToken: expect.any(String),
+      user: expect.objectContaining({
+        id: 'u1',
+        email: user.email,
+        role: UserRole.PATIENT,
+        domainId: 'p1',
+        emailVerified: true,
+      }),
+    });
+  });
+
+  it('refresh debe revocar sesion expirada y fallar', async () => {
+    const session = {
+      id: 'session-1',
+      userId: 'u1',
+      tokenHash: 'old-hash',
+      lastActivityAt: new Date(Date.now() - 60 * 1000),
+      expiresAt: new Date(Date.now() - 1000),
+      revokedAt: null,
+    };
+
+    refreshSessionsRepository.findOne.mockResolvedValueOnce(session);
+    refreshSessionsRepository.save.mockImplementation(async (saved: any) => saved);
+
+    await expect(service.refresh('expired-refresh-token')).rejects.toThrow(
+      UnauthorizedException,
+    );
+
+    expect(session.revokedAt).toBeInstanceOf(Date);
+    expect(refreshSessionsRepository.save).toHaveBeenCalledWith(session);
+    expect(jwtService.signAsync).not.toHaveBeenCalled();
+  });
+
+  it('logout debe revocar sesion si el refresh token existe', async () => {
+    const session = {
+      id: 'session-1',
+      userId: 'u1',
+      tokenHash: 'token-hash',
+      revokedAt: null,
+    };
+
+    refreshSessionsRepository.findOne.mockResolvedValueOnce(session);
+    refreshSessionsRepository.save.mockImplementation(async (saved: any) => saved);
+
+    const result = await service.logout('refresh-token');
+
+    expect(session.revokedAt).toBeInstanceOf(Date);
+    expect(refreshSessionsRepository.save).toHaveBeenCalledWith(session);
+    expect(result).toEqual({ message: 'Sesion cerrada' });
+  });
+
+  it('logout debe responder ok aunque no reciba refresh token', async () => {
+    const result = await service.logout();
+
+    expect(refreshSessionsRepository.findOne).not.toHaveBeenCalled();
+    expect(result).toEqual({ message: 'Sesion cerrada' });
+  });
 });
