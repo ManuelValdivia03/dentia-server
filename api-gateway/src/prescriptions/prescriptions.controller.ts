@@ -6,7 +6,7 @@ import {
   Param,
   Post,
   Req,
-  StreamableFile,
+  Res,
   UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
@@ -33,6 +33,7 @@ import { UserRole } from '../auth/enums/user-role.enum';
 import { CreatePrescriptionDto } from './dto/create-prescription.dto';
 import { RequestUser } from './interfaces/request-user.interface';
 import { PrescriptionsService } from './prescriptions.service';
+import type { Response } from 'express'
 
 type AuthenticatedRequest = Request & {
   user: RequestUser;
@@ -90,7 +91,6 @@ export class PrescriptionsController {
 
   @Get('prescriptions/:id/pdf')
   @Roles(UserRole.ADMIN, UserRole.DENTIST, UserRole.PATIENT)
-  @Header('Content-Type', 'application/pdf')
   @ApiOperation({ summary: 'Generar PDF de receta' })
   @ApiParam({ name: 'id', example: 'prescription_123' })
   @ApiProduces('application/pdf')
@@ -99,13 +99,27 @@ export class PrescriptionsController {
   @ApiForbiddenResponse({ description: 'No tiene permiso para descargar esta receta.' })
   @ApiUnauthorizedResponse({ description: 'JWT ausente o inválido.' })
   @ApiServiceUnavailableResponse({ description: 'prescriptions-service no disponible.' })
-  async generatePdf(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
-    const result = await this.prescriptionsService.generatePdf(id, req.user);
+  async generatePdf(
+    @Param('id') id: string,
+    @Req() req: AuthenticatedRequest,
+    @Res() res: Response,
+  ) {
+    const pdf = await this.prescriptionsService.generatePdf(
+      id,
+      req.user,
+      req.headers.authorization ?? '',
+    )
 
-    return new StreamableFile(Buffer.from(result.base64, 'base64'), {
-      disposition: `attachment; filename="${result.filename}"`,
-      type: result.contentType,
-    });
+    const buffer = Buffer.from(pdf.base64, 'base64')
+
+    res.setHeader('Content-Type', pdf.contentType)
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${pdf.filename}"`,
+    )
+    res.setHeader('Content-Length', buffer.length)
+
+    return res.send(buffer)
   }
 
   @Get('appointments/:appointmentId/prescriptions')
