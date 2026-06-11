@@ -12,6 +12,7 @@ import { PrescriptionStatus } from './enums/prescription-status.enum';
 import { RequestUser, RequestUserRole } from './interfaces/request-user.interface';
 import { generatePrescriptionPdf } from './pdf/prescription-pdf.generator';
 import { AppointmentsClient } from './appointments.client';
+import { UsersClient, type UserSummary } from '../users.client';
 
 @Injectable()
 export class PrescriptionsService {
@@ -19,7 +20,12 @@ export class PrescriptionsService {
     @InjectRepository(Prescription)
     private readonly prescriptionsRepository: Repository<Prescription>,
     private readonly appointmentsClient: AppointmentsClient,
+    private readonly usersClient: UsersClient,
   ) {}
+
+  private userDisplayName(user: UserSummary | null, fallback: string) {
+    return user?.fullName ?? user?.name ?? user?.email ?? fallback;
+  }
 
   async create(dto: CreatePrescriptionDto, requester: RequestUser, authHeader: string, ) {
     if (
@@ -123,10 +129,35 @@ export class PrescriptionsService {
     return prescription;
   }
 
-  async generatePdf(id: string, requester: RequestUser) {
+  async generatePdf(
+    id: string,
+    requester: RequestUser,
+    authHeader?: string,
+  ) {
     const prescription = await this.findOne(id, requester);
 
-    return generatePrescriptionPdf(prescription);
+    const [patient, dentist] = await Promise.all([
+      this.usersClient
+        .findUserByDomainId(prescription.patientId, authHeader)
+        .catch(() => null),
+      this.usersClient
+        .findDentistByDomainId(prescription.dentistId, authHeader)
+        .catch(() => null),
+    ]);
+
+    return generatePrescriptionPdf(prescription, {
+      patient: {
+        fullName: this.userDisplayName(patient, 'Paciente registrado'),
+        email: patient?.email,
+      },
+      dentist: {
+        fullName: this.userDisplayName(dentist, 'Dentista registrado'),
+        email: dentist?.email,
+        specialty: dentist?.specialty,
+        professionalLicense:
+          dentist?.cedulaProfesional ?? dentist?.professionalLicense,
+      },
+    });
   }
 
   async findByAppointment(appointmentId: string, requester: RequestUser) {

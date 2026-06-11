@@ -111,9 +111,13 @@ export class PrescriptionsController {
   @MessagePattern({ cmd: 'prescriptions.generatePdf' })
   generatePdf(
     @Payload()
-    payload: { id: string; requester: RequestUser },
+    payload: { id: string; requester: RequestUser; authHeader?: string },
   ) {
-    return this.prescriptionsService.generatePdf(payload.id, payload.requester);
+    return this.prescriptionsService.generatePdf(
+      payload.id,
+      payload.requester,
+      payload.authHeader,
+    );
   }
 
   private toRpcException(error: unknown): RpcException {
