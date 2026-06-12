@@ -46,6 +46,24 @@ describe('PrescriptionsService', () => {
     notes: 'Control en una semana',
   };
 
+  const result = generatePrescriptionPdf(prescription, {
+    patient: {
+      fullName: 'Paciente Demo',
+      email: 'paciente@demo.com',
+    },
+    dentist: {
+      fullName: 'Dra. Demo Dentia',
+      email: 'dentista@demo.com',
+      specialty: 'Ortodoncia',
+      professionalLicense: 'CED-12345',
+    },
+  })
+
+  expect(pdfText).toContain('Paciente Demo')
+  expect(pdfText).toContain('Dra. Demo Dentia')
+  expect(pdfText).toContain('Ortodoncia')
+  expect(pdfText).toContain('CED-12345')
+
   beforeEach(async () => {
     repository = {
       findOne: jest.fn(),

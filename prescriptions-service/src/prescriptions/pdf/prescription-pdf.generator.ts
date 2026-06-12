@@ -1,5 +1,22 @@
 import { Prescription } from '../entities/prescription.entity';
 
+export type PrescriptionPdfContext = {
+  patient?: {
+    fullName?: string;
+    email?: string;
+  };
+  dentist?: {
+    fullName?: string;
+    email?: string;
+    specialty?: string;
+    professionalLicense?: string;
+  };
+  appointment?: {
+    reason?: string;
+    startAt?: string | Date;
+  };
+};
+
 export type GeneratedPdf = {
   filename: string;
   contentType: 'application/pdf';
@@ -19,121 +36,125 @@ type PdfBoxOptions = {
 
 const PAGE_WIDTH = 612;
 const PAGE_HEIGHT = 792;
-const MARGIN_X = 48;
+const MARGIN_X = 54;
+const PRIMARY = '0F6B85';
+const TEXT = '172033';
+const MUTED = '667085';
+const LINE = '0F6B85';
+const LIGHT_LINE = 'D8E2EC';
 
-export function generatePrescriptionPdf(prescription: Prescription): GeneratedPdf {
+export function generatePrescriptionPdf(
+  prescription: Prescription,
+  context: PrescriptionPdfContext = {},
+): GeneratedPdf {
   const builder = new PdfBuilder();
+
+  const dentistName = displayValue(
+    context.dentist?.fullName,
+    'Dentista registrado',
+  );
+
+  const dentistSpecialty = displayValue(
+    context.dentist?.specialty,
+    'Odontología general',
+  );
+
+  const professionalLicense = displayValue(
+    context.dentist?.professionalLicense,
+    'No registrada',
+  );
+
+  const dentistEmail = displayValue(context.dentist?.email, 'No registrado');
+
+  const patientName = displayValue(
+    context.patient?.fullName,
+    'Paciente registrado',
+  );
+
+  const patientEmail = displayValue(context.patient?.email, 'No registrado');
 
   builder.rect(0, 0, PAGE_WIDTH, PAGE_HEIGHT, { fill: 'FFFFFF' });
 
-  builder.rect(0, PAGE_HEIGHT - 96, PAGE_WIDTH, 96, { fill: '0F6B85' });
-  builder.text('Dentia', MARGIN_X, 735, {
-    size: 26,
-    font: 'F2',
-    color: 'FFFFFF',
-  });
-  builder.text('Receta medica odontologica', MARGIN_X, 712, {
-    size: 13,
-    color: 'EAF7F8',
+  drawHeader(builder, {
+    dentistName,
+    dentistSpecialty,
+    professionalLicense,
+    dentistEmail,
   });
 
-  builder.text('Documento clinico', 420, 735, {
-    size: 11,
-    font: 'F2',
-    color: 'FFFFFF',
-  });
-  builder.text(`Fecha: ${formatDate(prescription.createdAt)}`, 420, 716, {
-    size: 10,
-    color: 'EAF7F8',
-  });
+  let y = 632;
 
-  let y = 650;
-
-  builder.text('Datos de la receta', MARGIN_X, y, {
-    size: 16,
-    font: 'F2',
-    color: '172033',
-  });
-
-  y -= 20;
-
-  builder.roundedRect(MARGIN_X, y - 72, PAGE_WIDTH - MARGIN_X * 2, 84, {
-    fill: 'F6FAFC',
-    stroke: 'D8E2EC',
-  });
-
-  builder.text('Folio de receta', MARGIN_X + 18, y - 6, {
-    size: 9,
-    font: 'F2',
-    color: '667085',
-  });
-  builder.text(shortId(prescription.id), MARGIN_X + 18, y - 24, {
+  builder.text('Datos del paciente', MARGIN_X, y, {
     size: 12,
     font: 'F2',
-    color: '172033',
+    color: PRIMARY,
   });
 
-  builder.text('Folio de cita', 230, y - 6, {
-    size: 9,
-    font: 'F2',
-    color: '667085',
-  });
-  builder.text(shortId(prescription.appointmentId), 230, y - 24, {
-    size: 12,
-    font: 'F2',
-    color: '172033',
-  });
+  y -= 26;
 
-  builder.text('Estado', 420, y - 6, {
-    size: 9,
-    font: 'F2',
-    color: '667085',
-  });
-  builder.text('Activa', 420, y - 24, {
-    size: 12,
-    font: 'F2',
-    color: '0F6B85',
-  });
-
-  y -= 120;
-
-  y = drawSection(builder, {
-    title: 'Diagnostico',
-    body: prescription.diagnosis || 'Sin diagnostico registrado.',
+  drawFieldLine(builder, {
+    label: 'Nombre',
+    value: patientName,
+    x: MARGIN_X,
     y,
+    width: 300,
   });
 
-  y -= 24;
+  drawFieldLine(builder, {
+    label: 'Fecha',
+    value: formatDate(prescription.createdAt),
+    x: 390,
+    y,
+    width: 168,
+  });
 
-  y = drawSection(builder, {
+  y -= 30;
+
+  drawFieldLine(builder, {
+    label: 'Correo',
+    value: patientEmail,
+    x: MARGIN_X,
+    y,
+    width: 300,
+  });
+
+  drawFieldLine(builder, {
+    label: 'Folio',
+    value: shortId(prescription.id),
+    x: 390,
+    y,
+    width: 168,
+  });
+
+  y -= 42;
+
+  y = drawClinicalSection(builder, {
+    title: 'Diagnóstico',
+    body: prescription.diagnosis || 'Sin diagnóstico registrado.',
+    y,
+    minHeight: 82,
+  });
+
+  y -= 18;
+
+  y = drawClinicalSection(builder, {
     title: 'Indicaciones',
     body: prescription.indications || 'Sin indicaciones registradas.',
     y,
+    minHeight: 130,
   });
 
-  y -= 24;
+  y -= 18;
 
-  y = drawSection(builder, {
+  y = drawClinicalSection(builder, {
     title: 'Notas adicionales',
     body: prescription.notes?.trim() || 'Sin notas adicionales.',
     y,
+    minHeight: 78,
   });
 
-  builder.line(MARGIN_X, 112, 250, 112, 'D8E2EC');
-  builder.text('Firma del dentista', MARGIN_X, 92, {
-    size: 10,
-    color: '667085',
-  });
-
-  builder.text('Este documento fue generado por Dentia.', MARGIN_X, 52, {
-    size: 9,
-    color: '667085',
-  });
-
-  builder.text(`Receta ${prescription.id}`, MARGIN_X, 36, {
-    size: 8,
-    color: '98A2B3',
-  });
+  drawSignature(builder, dentistName);
+  drawFooter(builder, prescription);
 
   const pdf = builder.build();
 
@@ -144,43 +165,162 @@ export function generatePrescriptionPdf(prescription: Prescription): GeneratedPd
   };
 }
 
-function drawSection(
+function drawHeader(
+  builder: PdfBuilder,
+  {
+    dentistName,
+    dentistSpecialty,
+    professionalLicense,
+    dentistEmail,
+  }: {
+    dentistName: string;
+    dentistSpecialty: string;
+    professionalLicense: string;
+    dentistEmail: string;
+  },
+) {
+  builder.text('Dentia', MARGIN_X, 742, {
+    size: 22,
+    font: 'F2',
+    color: PRIMARY,
+  });
+
+  builder.text('RECETA ODONTOLÓGICA', MARGIN_X, 719, {
+    size: 13,
+    font: 'F2',
+    color: TEXT,
+  });
+
+  builder.text(dentistName, 270, 742, {
+    size: 15,
+    font: 'F2',
+    color: PRIMARY,
+  });
+
+  builder.text(dentistSpecialty, 270, 720, {
+    size: 11,
+    color: TEXT,
+  });
+
+  builder.text(`Cédula profesional: ${professionalLicense}`, 270, 704, {
+    size: 10,
+    color: MUTED,
+  });
+
+  builder.text(`Correo: ${dentistEmail}`, 270, 688, {
+    size: 10,
+    color: MUTED,
+  });
+
+  builder.line(MARGIN_X, 672, PAGE_WIDTH - MARGIN_X, 672, LINE);
+  builder.line(MARGIN_X, 666, PAGE_WIDTH - MARGIN_X, 666, LIGHT_LINE);
+}
+
+function drawFieldLine(
+  builder: PdfBuilder,
+  {
+    label,
+    value,
+    x,
+    y,
+    width,
+  }: {
+    label: string;
+    value: string;
+    x: number;
+    y: number;
+    width: number;
+  },
+) {
+  builder.text(`${label}:`, x, y, {
+    size: 10,
+    font: 'F2',
+    color: PRIMARY,
+  });
+
+  const valueX = x + 64;
+
+  builder.text(trimForField(value, 34), valueX, y, {
+    size: 10,
+    color: TEXT,
+  });
+
+  builder.line(valueX, y - 5, x + width, y - 5, LIGHT_LINE);
+}
+
+function drawClinicalSection(
   builder: PdfBuilder,
   {
     title,
     body,
     y,
+    minHeight,
   }: {
     title: string;
     body: string;
     y: number;
+    minHeight: number;
   },
 ) {
-  const lines = wrapText(body, 86);
-  const boxHeight = Math.max(76, 42 + lines.length * 15);
-
   builder.text(title, MARGIN_X, y, {
-    size: 14,
+    size: 12,
     font: 'F2',
-    color: '172033',
+    color: PRIMARY,
   });
+
+  const lines = wrapText(body, 88);
+  const boxHeight = Math.max(minHeight, 34 + lines.length * 15);
 
   builder.roundedRect(MARGIN_X, y - boxHeight, PAGE_WIDTH - MARGIN_X * 2, boxHeight - 18, {
     fill: 'FFFFFF',
-    stroke: 'D8E2EC',
+    stroke: LIGHT_LINE,
   });
 
   let textY = y - 34;
 
   for (const line of lines) {
-    builder.text(line, MARGIN_X + 18, textY, {
-      size: 11,
-      color: '344054',
+    builder.text(line, MARGIN_X + 16, textY, {
+      size: 10.5,
+      color: TEXT,
     });
+
     textY -= 15;
   }
 
-  return y - boxHeight - 6;
+  return y - boxHeight - 4;
+}
+
+function drawSignature(builder: PdfBuilder, dentistName: string) {
+  builder.line(390, 116, PAGE_WIDTH - MARGIN_X, 116, LINE);
+
+  builder.text(dentistName, 410, 96, {
+    size: 10,
+    color: TEXT,
+  });
+
+  builder.text('Firma del dentista', 410, 80, {
+    size: 9,
+    color: MUTED,
+  });
+}
+
+function drawFooter(builder: PdfBuilder, prescription: Prescription) {
+  builder.line(MARGIN_X, 62, PAGE_WIDTH - MARGIN_X, 62, LIGHT_LINE);
+
+  builder.text('Documento generado por Dentia para seguimiento clínico odontológico.', MARGIN_X, 44, {
+    size: 8.5,
+    color: MUTED,
+  });
+
+  builder.text(`ID interno de receta: ${prescription.id}`, MARGIN_X, 30, {
+    size: 7.5,
+    color: '98A2B3',
+  });
+
+  builder.text(`ID interno de cita: ${prescription.appointmentId}`, 330, 30, {
+    size: 7.5,
+    color: '98A2B3',
+  });
 }
 
 class PdfBuilder {
@@ -264,7 +404,7 @@ function wrapText(value: string, maxLength: number): string[] {
   const normalized = toWinAnsiSafe(value).replace(/\s+/g, ' ').trim();
 
   if (!normalized) {
-    return ['Sin informacion registrada.'];
+    return ['Sin información registrada.'];
   }
 
   const words = normalized.split(' ');
@@ -278,6 +418,7 @@ function wrapText(value: string, maxLength: number): string[] {
       if (current) {
         lines.push(current);
       }
+
       current = word;
     } else {
       current = next;
@@ -312,7 +453,9 @@ function roundColor(value: number) {
   return Number(value.toFixed(4));
 }
 
-function formatDate(value: Date): string {
+function formatDate(value?: string | Date): string {
+  if (!value) return 'Sin fecha';
+
   return new Intl.DateTimeFormat('es-MX', {
     dateStyle: 'medium',
     timeStyle: 'short',
@@ -322,6 +465,16 @@ function formatDate(value: Date): string {
 
 function shortId(value: string) {
   return value.slice(0, 8);
+}
+
+function displayValue(value: string | undefined, fallback: string) {
+  const trimmed = value?.trim();
+  return trimmed || fallback;
+}
+
+function trimForField(value: string, maxLength: number) {
+  if (value.length <= maxLength) return value;
+  return `${value.slice(0, maxLength - 3)}...`;
 }
 
 function toWinAnsiSafe(value: string): string {

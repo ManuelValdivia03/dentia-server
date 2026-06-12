@@ -45,11 +45,14 @@ export class PrescriptionsService {
     );
   }
 
-  generatePdf(id: string, requester: RequestUser) {
+  generatePdf(id: string, requester: RequestUser, authHeader: string) {
     return this.forward(
-      this.client.send({ cmd: 'prescriptions.generatePdf' }, { id, requester }),
+      this.client.send(
+        { cmd: 'prescriptions.generatePdf' },
+        { id, requester, authHeader },
+      ),
       'prescriptions.generatePdf',
-    );
+    )
   }
 
   private async forward(request: any, operation: string): Promise<any> {
