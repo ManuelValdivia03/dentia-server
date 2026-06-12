@@ -344,6 +344,51 @@ public class AppointmentsServiceTests
     }
 
     [Fact]
+    public async Task RescheduleAsync_ShouldThrow409_WhenAppointmentIsConfirmed()
+    {
+        await using var db = CreateDbContext();
+
+        var appointmentId = Guid.NewGuid();
+        var originalStartAt = FutureDate(9);
+        var originalEndAt = FutureDate(9, 11);
+
+        db.Appointments.Add(new Appointment
+        {
+            Id = appointmentId,
+            PatientId = "p1",
+            DentistId = "d1",
+            StartAt = originalStartAt,
+            EndAt = originalEndAt,
+            Status = AppointmentStatus.CONFIRMED
+        });
+
+        await db.SaveChangesAsync();
+
+        var service = CreateService(db);
+
+        var ex = await Assert.ThrowsAsync<AppException>(() =>
+            service.RescheduleAsync(
+                appointmentId,
+                new RescheduleAppointmentDto
+                {
+                    StartAt = FutureDate(10),
+                    EndAt = FutureDate(10, 11)
+                },
+                Patient("p1")
+            )
+        );
+
+        Assert.Equal(409, ex.StatusCode);
+        Assert.Equal("Only pending appointments can be rescheduled", ex.Message);
+
+        var appointment = await db.Appointments.FindAsync(appointmentId);
+        Assert.NotNull(appointment);
+        Assert.Equal(AppointmentStatus.CONFIRMED, appointment.Status);
+        Assert.Equal(originalStartAt, appointment.StartAt);
+        Assert.Equal(originalEndAt, appointment.EndAt);
+    }
+
+    [Fact]
     public async Task FindAllAsync_ShouldReturnOnlyPatientAppointments_WhenRequesterIsPatient()
     {
         await using var db = CreateDbContext();

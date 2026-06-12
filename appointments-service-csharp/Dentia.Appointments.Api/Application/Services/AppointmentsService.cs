@@ -233,9 +233,12 @@ public class AppointmentsService : IAppointmentsService
             throw new AppException(StatusCodes.Status403Forbidden, "Only admin or appointment patient can reschedule");
         }
 
-        if (appointment.Status == AppointmentStatus.CANCELLED)
+        if (appointment.Status != AppointmentStatus.PENDING)
         {
-            throw new AppException(StatusCodes.Status400BadRequest, "Cancelled appointments cannot be rescheduled");
+            throw new AppException(
+                StatusCodes.Status409Conflict,
+                "Only pending appointments can be rescheduled"
+            );
         }
 
         var startAt = ToDbTimestamp(dto.StartAt);

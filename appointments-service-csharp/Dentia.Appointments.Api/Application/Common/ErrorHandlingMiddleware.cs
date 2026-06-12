@@ -5,10 +5,14 @@ namespace Dentia.Appointments.Api.Application.Common;
 public class ErrorHandlingMiddleware
 {
     private readonly RequestDelegate _next;
+    private readonly ILogger<ErrorHandlingMiddleware> _logger;
 
-    public ErrorHandlingMiddleware(RequestDelegate next)
+    public ErrorHandlingMiddleware(
+        RequestDelegate next,
+        ILogger<ErrorHandlingMiddleware> logger)
     {
         _next = next;
+        _logger = logger;
     }
 
     public async Task Invoke(HttpContext context)
@@ -21,13 +25,28 @@ public class ErrorHandlingMiddleware
         {
             await WriteError(context, ex.StatusCode, ex.Message);
         }
-        catch (KeyNotFoundException ex)
+        catch (KeyNotFoundException)
         {
-            await WriteError(context, StatusCodes.Status404NotFound, ex.Message);
+            await WriteError(
+                context,
+                StatusCodes.Status404NotFound,
+                "The requested resource was not found"
+            );
         }
         catch (Exception ex)
         {
-            await WriteError(context, StatusCodes.Status500InternalServerError, ex.Message);
+            _logger.LogError(
+                ex,
+                "Unhandled error processing {Method} {Path}",
+                context.Request.Method,
+                context.Request.Path
+            );
+
+            await WriteError(
+                context,
+                StatusCodes.Status500InternalServerError,
+                "An unexpected error occurred"
+            );
         }
     }
 
