@@ -1,4 +1,4 @@
-const { execFileSync } = require('child_process');
+const { Client } = require('pg');
 const { request, expectStatus } = require('./helpers/http');
 const {
   loginAsPatient,
@@ -18,7 +18,7 @@ describe('Dentia clinical records real integration flow', () => {
   let encounterId;
 
   beforeAll(async () => {
-    cleanClinicalRecords();
+    await cleanClinicalRecords();
 
     const patientLogin = await loginAsPatient();
     const secondPatientLogin = await loginAsSecondPatient();
@@ -210,35 +210,36 @@ describe('Dentia clinical records real integration flow', () => {
   });
 });
 
-function cleanClinicalRecords() {
-  const containerName = process.env.POSTGRES_CONTAINER ?? 'dentia-postgres';
-  const dbUser = process.env.POSTGRES_USER ?? 'dentia';
-  const dbName = process.env.PRESCRIPTIONS_DB_NAME ?? 'dentia_prescriptions';
+async function cleanClinicalRecords() {
+  const client = new Client({
+    host: process.env.POSTGRES_HOST || 'localhost',
+    port: Number(process.env.POSTGRES_PORT || 5439),
+    user: process.env.POSTGRES_USER || 'dentia_test',
+    password: process.env.POSTGRES_PASSWORD || 'dentia_test',
+    database:
+      process.env.PRESCRIPTIONS_POSTGRES_DB ||
+      process.env.PRESCRIPTIONS_DB_NAME ||
+      'dentia_prescriptions_test',
+  });
 
-  const sql = `
+  await client.connect();
+
+  await client.query(`
     DELETE FROM clinical_encounters
-    WHERE patient_id IN ('p-it-patient-001', 'p-it-patient-002', 'p-it-patient-no-relation')
+    WHERE patient_id IN (
+      'p-it-patient-001',
+      'p-it-patient-002',
+      'p-it-patient-no-relation'
+    )
        OR appointment_id = '44444444-4444-4444-8444-444444444444';
 
     DELETE FROM clinical_records
-    WHERE patient_id IN ('p-it-patient-001', 'p-it-patient-002', 'p-it-patient-no-relation');
-  `;
+    WHERE patient_id IN (
+      'p-it-patient-001',
+      'p-it-patient-002',
+      'p-it-patient-no-relation'
+    );
+  `);
 
-  execFileSync(
-    'docker',
-    [
-      'exec',
-      containerName,
-      'psql',
-      '-U',
-      dbUser,
-      '-d',
-      dbName,
-      '-c',
-      sql,
-    ],
-    {
-      stdio: 'pipe',
-    },
-  );
+  await client.end();
 }
