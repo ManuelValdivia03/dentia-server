@@ -14,7 +14,10 @@ async function main() {
   await client.query('DELETE FROM "appointment_ratings";');
   await client.query(`
     DELETE FROM appointments
-    WHERE id <> '44444444-4444-4444-4444-444444444444';
+    WHERE id NOT IN (
+      '44444444-4444-4444-4444-444444444444',
+      '44444444-4444-4444-8444-444444444444'
+    );
   `);
 
   await client.query(`
@@ -39,6 +42,41 @@ async function main() {
       'COMPLETED'::appointments_status_enum,
       'Cita completada para receta IT',
       'Seed de integración',
+      now(),
+      now()
+    )
+    ON CONFLICT (id)
+    DO UPDATE SET
+      "patientId" = EXCLUDED."patientId",
+      "dentistId" = EXCLUDED."dentistId",
+      "startAt" = EXCLUDED."startAt",
+      "endAt" = EXCLUDED."endAt",
+      status = EXCLUDED.status,
+      reason = EXCLUDED.reason,
+      notes = EXCLUDED.notes,
+      "updatedAt" = now();
+
+    INSERT INTO appointments (
+      id,
+      "patientId",
+      "dentistId",
+      "startAt",
+      "endAt",
+      status,
+      reason,
+      notes,
+      "createdAt",
+      "updatedAt"
+    )
+    VALUES (
+      '44444444-4444-4444-8444-444444444444',
+      'p-it-patient-001',
+      'd-it-dentist-001',
+      '2026-06-01 12:00:00',
+      '2026-06-01 13:00:00',
+      'COMPLETED'::appointments_status_enum,
+      'Cita completada para expediente clínico IT',
+      'Seed de integración expediente clínico',
       now(),
       now()
     )
