@@ -19,6 +19,9 @@ public interface IPaymentsService
         string? to,
         string? dentistId,
         RequestUser requester);
+    Task<PaymentPeriodsResponseDto> GetAvailablePeriodsAsync(
+        string? dentistId,
+        RequestUser requester);
 }
 
 public class PaymentsService : IPaymentsService
@@ -87,16 +90,6 @@ public class PaymentsService : IPaymentsService
         }
 
         var now = AppointmentTime.Now();
-        var paidAt = dto.PaidAt.HasValue
-            ? ToDbTimestamp(dto.PaidAt.Value)
-            : now;
-
-        if (paidAt > now.AddMinutes(1))
-        {
-            throw new AppException(
-                StatusCodes.Status400BadRequest,
-                "Payment date cannot be in the future");
-        }
 
         var payment = new AppointmentPayment
         {
@@ -108,7 +101,7 @@ public class PaymentsService : IPaymentsService
             Method = method,
             TreatmentDescription = dto.TreatmentDescription.Trim(),
             Notes = string.IsNullOrWhiteSpace(dto.Notes) ? null : dto.Notes.Trim(),
-            PaidAt = paidAt,
+            PaidAt = now,
             CreatedAt = now,
         };
 
@@ -185,6 +178,27 @@ public class PaymentsService : IPaymentsService
         };
     }
 
+    public async Task<PaymentPeriodsResponseDto> GetAvailablePeriodsAsync(
+        string? dentistId,
+        RequestUser requester)
+    {
+        var query = ApplyAccessFilter(
+            _db.AppointmentPayments.AsNoTracking(),
+            dentistId,
+            requester);
+
+        var dates = await query
+            .Select(x => x.PaidAt.Date)
+            .Distinct()
+            .OrderByDescending(x => x)
+            .ToListAsync();
+
+        return new PaymentPeriodsResponseDto
+        {
+            Dates = dates.Select(x => x.ToString("yyyy-MM-dd")).ToList(),
+        };
+    }
+
     private static (DateTime Start, DateTime End) ParseRange(string? from, string? to)
     {
         var today = DateOnly.FromDateTime(AppointmentTime.Now());
@@ -199,14 +213,14 @@ public class PaymentsService : IPaymentsService
         {
             throw new AppException(
                 StatusCodes.Status400BadRequest,
-                "to must be on or after from");
+                "La fecha final debe ser igual o posterior a la fecha inicial");
         }
 
         if (endDate.DayNumber - startDate.DayNumber > 3660)
         {
             throw new AppException(
                 StatusCodes.Status400BadRequest,
-                "Payment range cannot exceed 10 years");
+                "El periodo del corte no puede superar 10 años");
         }
 
         return (
@@ -220,7 +234,7 @@ public class PaymentsService : IPaymentsService
         {
             throw new AppException(
                 StatusCodes.Status400BadRequest,
-                $"{field} must be a valid date");
+                $"{field} debe ser una fecha válida");
         }
 
         return date;
@@ -256,6 +270,26 @@ public class PaymentsService : IPaymentsService
         if (requester.Role == UserRoles.Dentist && requester.DomainId == dentistId)
         {
             return;
+        }
+
+        throw new AppException(StatusCodes.Status403Forbidden, "Access denied");
+    }
+
+    private static IQueryable<AppointmentPayment> ApplyAccessFilter(
+        IQueryable<AppointmentPayment> query,
+        string? dentistId,
+        RequestUser requester)
+    {
+        if (requester.Role == UserRoles.Dentist)
+        {
+            return query.Where(x => x.DentistId == requester.DomainId);
+        }
+
+        if (requester.Role == UserRoles.Admin)
+        {
+            return string.IsNullOrWhiteSpace(dentistId)
+                ? query
+                : query.Where(x => x.DentistId == dentistId);
         }
 
         throw new AppException(StatusCodes.Status403Forbidden, "Access denied");

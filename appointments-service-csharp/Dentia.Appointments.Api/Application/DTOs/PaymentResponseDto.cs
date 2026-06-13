@@ -31,3 +31,8 @@ public class CashCutResponseDto
     public List<PaymentMethodSummaryDto> ByMethod { get; set; } = [];
     public List<PaymentResponseDto> Payments { get; set; } = [];
 }
+
+public class PaymentPeriodsResponseDto
+{
+    public List<string> Dates { get; set; } = [];
+}

@@ -1,6 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
-  IsDateString,
   IsIn,
   IsNumber,
   IsOptional,
@@ -34,8 +33,4 @@ export class CreatePaymentDto {
   @MaxLength(1000)
   notes?: string;
 
-  @ApiPropertyOptional({ example: '2026-06-12T12:30:00' })
-  @IsOptional()
-  @IsDateString()
-  paidAt?: string;
 }

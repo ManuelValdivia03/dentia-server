@@ -18,5 +18,4 @@ public class CreateAppointmentPaymentDto
     [MaxLength(1000)]
     public string? Notes { get; set; }
 
-    public DateTime? PaidAt { get; set; }
 }

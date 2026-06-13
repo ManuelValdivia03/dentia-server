@@ -161,6 +161,19 @@ export class AppointmentsService {
     });
   }
 
+  async getPaymentPeriods(
+    dentistId: string | undefined,
+    authHeader: string,
+  ) {
+    const query = new URLSearchParams();
+    if (dentistId) query.set('dentistId', dentistId);
+
+    return this.request(`/payments/periods?${query.toString()}`, {
+      method: 'GET',
+      authHeader,
+    });
+  }
+
   private async request(
     path: string,
     options: {

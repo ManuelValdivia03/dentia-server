@@ -67,6 +67,20 @@ export class PaymentsController {
     );
   }
 
+  @Get('periods')
+  @Roles(UserRole.ADMIN, UserRole.DENTIST)
+  @ApiOperation({ summary: 'Listar fechas que tienen pagos registrados' })
+  @ApiQuery({ name: 'dentistId', required: false })
+  getPeriods(
+    @Query('dentistId') dentistId: string | undefined,
+    @Req() req: Request,
+  ) {
+    return this.appointmentsService.getPaymentPeriods(
+      dentistId,
+      this.getAuthHeader(req),
+    );
+  }
+
   private getAuthHeader(req: Request) {
     const authHeader = req.headers.authorization;
 

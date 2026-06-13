@@ -51,6 +51,7 @@ public class PaymentsServiceTests
         Assert.Equal(850, result.Amount);
         Assert.Equal("CARD", result.Method);
         Assert.Equal("Limpieza dental", result.TreatmentDescription);
+        Assert.Equal(AppointmentTime.Now().Date, result.PaidAt.Date);
         Assert.Single(db.AppointmentPayments);
     }
 
@@ -117,6 +118,32 @@ public class PaymentsServiceTests
         Assert.Equal(1250, result.TotalAmount);
         Assert.Equal(2, result.ByMethod.Count);
         Assert.DoesNotContain(result.Payments, x => x.DentistId == "dentist-2");
+    }
+
+    [Fact]
+    public async Task GetAvailablePeriodsAsync_ShouldReturnOnlyDentistPaymentDates()
+    {
+        await using var db = CreateDbContext();
+        var first = CompletedAppointment();
+        var second = CompletedAppointment();
+        var otherDentist = CompletedAppointment("dentist-2");
+        db.Appointments.AddRange(first, second, otherDentist);
+        await db.SaveChangesAsync();
+
+        var service = new PaymentsService(db);
+        await service.CreateAsync(first.Id, ValidPayment(500), Dentist());
+        await service.CreateAsync(second.Id, ValidPayment(750), Dentist());
+        await service.CreateAsync(
+            otherDentist.Id,
+            ValidPayment(2000),
+            Dentist("dentist-2"));
+
+        var result = await service.GetAvailablePeriodsAsync(null, Dentist());
+
+        Assert.Single(result.Dates);
+        Assert.Equal(
+            DateOnly.FromDateTime(AppointmentTime.Now()).ToString("yyyy-MM-dd"),
+            result.Dates[0]);
     }
 
     private static Appointment CompletedAppointment(string dentistId = "dentist-1")

@@ -44,4 +44,14 @@ public class PaymentsController : ControllerBase
         var result = await _paymentsService.GetCashCutAsync(from, to, dentistId, requester);
         return Ok(result);
     }
+
+    [HttpGet("periods")]
+    [Authorize(Roles = $"{UserRoles.Admin},{UserRoles.Dentist}")]
+    public async Task<IActionResult> GetAvailablePeriods(
+        [FromQuery] string? dentistId)
+    {
+        var requester = _currentUserService.GetCurrentUser();
+        var result = await _paymentsService.GetAvailablePeriodsAsync(dentistId, requester);
+        return Ok(result);
+    }
 }
