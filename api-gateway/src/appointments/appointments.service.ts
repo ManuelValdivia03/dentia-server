@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
 import { RescheduleAppointmentDto } from './dto/reschedule-appointment.dto';
+import { CreatePaymentDto } from './dto/create-payment.dto';
 
 @Injectable()
 export class AppointmentsService {
@@ -125,6 +126,36 @@ export class AppointmentsService {
 
   async getDentistRatingsSummary(dentistId: string, authHeader: string) {
     return this.request(`/dentists/${dentistId}/ratings/summary`, {
+      method: 'GET',
+      authHeader,
+    });
+  }
+
+  async createPayment(
+    appointmentId: string,
+    dto: CreatePaymentDto,
+    authHeader: string,
+  ) {
+    return this.request(`/payments/appointments/${appointmentId}`, {
+      method: 'POST',
+      authHeader,
+      body: dto,
+    });
+  }
+
+  async getPayments(
+    from: string | undefined,
+    to: string | undefined,
+    dentistId: string | undefined,
+    authHeader: string,
+  ) {
+    const query = new URLSearchParams();
+
+    if (from) query.set('from', from);
+    if (to) query.set('to', to);
+    if (dentistId) query.set('dentistId', dentistId);
+
+    return this.request(`/payments?${query.toString()}`, {
       method: 'GET',
       authHeader,
     });

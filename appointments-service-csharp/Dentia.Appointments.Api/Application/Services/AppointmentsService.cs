@@ -75,6 +75,7 @@ public class AppointmentsService : IAppointmentsService
                 CreatedAt = x.CreatedAt,
                 UpdatedAt = x.UpdatedAt,
                 HasRating = _db.AppointmentRatings.Any(r => r.AppointmentId == x.Id),
+                HasPayment = _db.AppointmentPayments.Any(p => p.AppointmentId == x.Id),
             })
             .ToListAsync();
     }

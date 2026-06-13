@@ -13,6 +13,7 @@ public class AppointmentsDbContext : DbContext
 
     public DbSet<Appointment> Appointments => Set<Appointment>();
     public DbSet<AppointmentRating> AppointmentRatings => Set<AppointmentRating>();
+    public DbSet<AppointmentPayment> AppointmentPayments => Set<AppointmentPayment>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -111,6 +112,24 @@ public class AppointmentsDbContext : DbContext
                 .IsUnique();
 
             entity.HasIndex(x => x.DentistId);
+        });
+
+        modelBuilder.Entity<AppointmentPayment>(entity =>
+        {
+            entity.ToTable("appointment_payments");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).HasColumnName("id").HasColumnType("uuid");
+            entity.Property(x => x.AppointmentId).HasColumnName("appointmentId").HasColumnType("uuid").IsRequired();
+            entity.Property(x => x.PatientId).HasColumnName("patientId").IsRequired();
+            entity.Property(x => x.DentistId).HasColumnName("dentistId").IsRequired();
+            entity.Property(x => x.Amount).HasColumnName("amount").HasColumnType("numeric(12,2)").IsRequired();
+            entity.Property(x => x.Method).HasColumnName("method").HasMaxLength(30).IsRequired();
+            entity.Property(x => x.TreatmentDescription).HasColumnName("treatmentDescription").HasMaxLength(500).IsRequired();
+            entity.Property(x => x.Notes).HasColumnName("notes").HasColumnType("text");
+            entity.Property(x => x.PaidAt).HasColumnName("paidAt").HasColumnType("timestamp without time zone").IsRequired();
+            entity.Property(x => x.CreatedAt).HasColumnName("createdAt").HasColumnType("timestamp without time zone").IsRequired();
+            entity.HasIndex(x => x.AppointmentId).IsUnique();
+            entity.HasIndex(x => new { x.DentistId, x.PaidAt });
         });
     }
 }

@@ -45,6 +45,7 @@ builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 builder.Services.AddScoped<IExpiredAppointmentsService, ExpiredAppointmentsService>();
 builder.Services.AddScoped<IAppointmentsService, AppointmentsService>();
 builder.Services.AddScoped<IRatingsService, RatingsService>();
+builder.Services.AddScoped<IPaymentsService, PaymentsService>();
 builder.Services.AddScoped<IAppointmentEventsPublisher, AppointmentEventsPublisher>();
 builder.Services.AddHttpClient<IReportsClient, ReportsClient>();
 builder.Services.AddHostedService<ExpiredAppointmentsBackgroundService>();
@@ -120,6 +121,26 @@ using (var scope = app.Services.CreateScope())
     db.Database.ExecuteSqlRaw("""
         CREATE INDEX IF NOT EXISTS "IX_appointment_ratings_dentistId"
         ON "appointment_ratings" ("dentistId");
+    """);
+
+    db.Database.ExecuteSqlRaw("""
+        CREATE TABLE IF NOT EXISTS "appointment_payments" (
+            "id" uuid PRIMARY KEY,
+            "appointmentId" uuid NOT NULL UNIQUE,
+            "patientId" text NOT NULL,
+            "dentistId" text NOT NULL,
+            "amount" numeric(12,2) NOT NULL CHECK ("amount" > 0),
+            "method" varchar(30) NOT NULL,
+            "treatmentDescription" varchar(500) NOT NULL,
+            "notes" text NULL,
+            "paidAt" timestamp without time zone NOT NULL,
+            "createdAt" timestamp without time zone NOT NULL
+        );
+    """);
+
+    db.Database.ExecuteSqlRaw("""
+        CREATE INDEX IF NOT EXISTS "IX_appointment_payments_dentistId_paidAt"
+        ON "appointment_payments" ("dentistId", "paidAt");
     """);
 }
 

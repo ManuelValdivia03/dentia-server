@@ -13,4 +13,5 @@ public class AppointmentResponseDto
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
     public bool HasRating { get; set; }
+    public bool HasPayment { get; set; }
 }
