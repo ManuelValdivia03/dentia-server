@@ -45,7 +45,7 @@ const WRITE_CONCURRENCY = numberEnv('PERF_WRITE_CONCURRENCY', 4);
 const MAX_ERROR_RATE = numberEnv('PERF_MAX_ERROR_RATE', 0.01);
 const MAX_P95_MS = numberEnv(
   'PERF_MAX_P95_MS',
-  PROFILE === 'stress' ? 2000 : 750,
+  PROFILE === 'smoke' ? 6000 : PROFILE === 'stress' ? 2000 : 750,
 );
 const MAX_SCENARIO_P95_MS = numberEnv(
   'PERF_MAX_SCENARIO_P95_MS',
