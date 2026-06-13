@@ -3,6 +3,7 @@ import { ClientsModule, Transport } from '@nestjs/microservices';
 import { PrescriptionsController } from './prescriptions.controller';
 import { PrescriptionsService } from './prescriptions.service';
 import { AuthModule } from '../auth/auth.module';
+import { ClinicalRecordsController } from './clinical-records.controller';
 
 @Module({
   imports: [
@@ -18,7 +19,7 @@ import { AuthModule } from '../auth/auth.module';
       },
     ]),
   ],
-  controllers: [PrescriptionsController],
+  controllers: [PrescriptionsController, ClinicalRecordsController],
   providers: [PrescriptionsService],
 })
 export class PrescriptionsModule {}

@@ -8,6 +8,8 @@ import { ClientProxy } from '@nestjs/microservices';
 import { firstValueFrom } from 'rxjs';
 import { CreatePrescriptionDto } from './dto/create-prescription.dto';
 import { RequestUser } from './interfaces/request-user.interface';
+import { UpdateClinicalRecordDto } from './dto/update-clinical-record.dto';
+import { CreateClinicalEncounterDto } from './dto/create-clinical-encounter.dto';
 
 @Injectable()
 export class PrescriptionsService {
@@ -53,6 +55,66 @@ export class PrescriptionsService {
       ),
       'prescriptions.generatePdf',
     )
+  }
+
+  findClinicalRecordByPatient(
+    patientId: string,
+    requester: RequestUser,
+    authHeader: string,
+    dentistId?: string,
+  ) {
+    return this.forward(
+      this.client.send(
+        { cmd: 'clinicalRecords.findByPatient' },
+        {
+          patientId,
+          requester,
+          dentistId,
+          authHeader,
+        },
+      ),
+      'clinicalRecords.findByPatient',
+    );
+  }
+
+  updateClinicalRecord(
+    patientId: string,
+    dto: UpdateClinicalRecordDto,
+    requester: RequestUser,
+    authHeader: string,
+  ) {
+    return this.forward(
+      this.client.send(
+        { cmd: 'clinicalRecords.updatePatientRecord' },
+        {
+          patientId,
+          dto,
+          requester,
+          authHeader,
+        },
+      ),
+      'clinicalRecords.updatePatientRecord',
+    );
+  }
+
+  createClinicalEncounter(
+    patientId: string,
+    dto: CreateClinicalEncounterDto,
+    requester: RequestUser,
+    authHeader: string,
+  ) {
+    return this.forward(
+      this.client.send(
+        { cmd: 'clinicalRecords.createEncounter' },
+        {
+          patientId,
+          dto,
+          requester,
+          authHeader,
+        },
+      ),
+      'clinicalRecords.createEncounter',
+    );
   }
 
   private async forward(request: any, operation: string): Promise<any> {
